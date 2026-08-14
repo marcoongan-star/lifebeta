@@ -24,8 +24,9 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Historical snapshots that select the newest eligible observation without looking ahead.
 - Explicit missing-data and stale-data reporting.
 - Category attribution that reconciles exactly with the personal index change.
+- FastAPI catalog and personal-index endpoints with typed requests and structured missing-data errors.
 
-The current test suite has nine checks. Seeded values are examples, never claims of live prices.
+The current test suite has twelve checks. Seeded values are examples, never claims of live prices.
 
 ## Planned stack
 
@@ -43,6 +44,14 @@ python3 -m venv .venv
 .venv/bin/pytest
 ```
 
+Start the local API with:
+
+```bash
+.venv/bin/uvicorn lifebeta.api:app --reload
+```
+
+Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
+
 ## Repository map
 
 | Area | Purpose |
@@ -50,17 +59,18 @@ python3 -m venv .venv
 | `src/lifebeta/catalog.py` | Personal products and comparable units |
 | `src/lifebeta/prices.py` | Price observations, provenance, and package normalization |
 | `src/lifebeta/analytics.py` | Trustworthy snapshots and category attribution |
+| `src/lifebeta/api.py` | Typed catalog and personal-index HTTP endpoints |
 | `src/lifebeta/index.py` | Fixed-basket index and product contributions |
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_analytics.py` to understand the Day 2 feature. See [Milestone 2](docs/milestone-2.md) for its data flow.
+Start with `tests/test_api.py` to understand the Day 3 request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic and [Milestone 3](docs/milestone-3.md) for the API boundary.
 
 ## Next milestones
 
 1. Persist products and provenance-aware price history.
-2. Expose catalog, snapshot, and index endpoints through FastAPI.
+2. Persist and retrieve snapshots through the FastAPI service.
 3. Add public CPI comparison series with source citations.
 4. Build the personal contribution and portfolio-exposure interface.
 
