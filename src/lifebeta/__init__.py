@@ -2,9 +2,11 @@
 
 from .analytics import (
     MissingPriceError,
+    InflationDriver,
     PriceSnapshot,
     category_point_contributions,
     select_price_snapshot,
+    rank_inflation_drivers,
 )
 from .catalog import Category, Product, Unit, marco_catalog
 from .holdings import Holding, parse_fidelity_holdings
@@ -17,6 +19,7 @@ __all__ = [
     "Holding",
     "IndexResult",
     "MissingPriceError",
+    "InflationDriver",
     "PriceObservation",
     "PriceSnapshot",
     "Product",
@@ -27,4 +30,5 @@ __all__ = [
     "marco_catalog",
     "parse_fidelity_holdings",
     "select_price_snapshot",
+    "rank_inflation_drivers",
 ]

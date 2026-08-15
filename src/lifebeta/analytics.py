@@ -24,6 +24,14 @@ class MissingPriceError(ValueError):
         super().__init__(f"missing eligible prices for: {', '.join(self.product_ids)}")
 
 
+@dataclass(frozen=True)
+class InflationDriver:
+    category: Category
+    point_contribution: Decimal
+    share_of_net_change: Decimal | None
+    direction: str
+
+
 def select_price_snapshot(
     catalog: dict[str, Product],
     observations: tuple[PriceObservation, ...],
@@ -90,3 +98,29 @@ def category_point_contributions(
         category = catalog[product_id].category
         contributions[category] = contributions.get(category, Decimal("0")) + points
     return contributions
+
+
+def rank_inflation_drivers(
+    category_contributions: dict[Category, Decimal],
+    *,
+    total_point_change: Decimal,
+) -> tuple[InflationDriver, ...]:
+    """Rank category effects while preserving deflationary offsets."""
+    if sum(category_contributions.values(), start=Decimal("0")) != total_point_change:
+        raise ValueError("category contributions must reconcile to the total point change")
+
+    drivers = []
+    for category, contribution in category_contributions.items():
+        if contribution > 0:
+            direction = "inflationary"
+        elif contribution < 0:
+            direction = "deflationary"
+        else:
+            direction = "neutral"
+        share = None
+        if total_point_change != 0:
+            share = (Decimal("100") * contribution / total_point_change).quantize(
+                Decimal("0.01")
+            )
+        drivers.append(InflationDriver(category, contribution, share, direction))
+    return tuple(sorted(drivers, key=lambda driver: abs(driver.point_contribution), reverse=True))

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from .analytics import (
     MissingPriceError,
     category_point_contributions,
+    rank_inflation_drivers,
     select_price_snapshot,
 )
 from .catalog import Category, marco_catalog
@@ -58,9 +59,17 @@ class IndexResponse(BaseModel):
     base_cost: Decimal
     current_cost: Decimal
     category_point_contributions: dict[Category, Decimal]
+    ranked_drivers: list["InflationDriverView"]
     current_observation_dates: dict[str, date]
     stale_product_ids: list[str]
     data_status: str
+
+
+class InflationDriverView(BaseModel):
+    category: Category
+    point_contribution: Decimal
+    share_of_net_change: Decimal | None
+    direction: str
 
 
 def calculate_index(payload: IndexRequest) -> IndexResponse:
@@ -103,6 +112,10 @@ def calculate_index(payload: IndexRequest) -> IndexResponse:
         base.unit_prices,
         current.unit_prices,
     )
+    contributions = category_point_contributions(result, catalog)
+    drivers = rank_inflation_drivers(
+        contributions, total_point_change=result.level - Decimal("100")
+    )
     return IndexResponse(
         base_as_of=payload.base_as_of,
         current_as_of=payload.current_as_of,
@@ -111,7 +124,16 @@ def calculate_index(payload: IndexRequest) -> IndexResponse:
         percent_change=result.level - Decimal("100"),
         base_cost=result.base_cost,
         current_cost=result.current_cost,
-        category_point_contributions=category_point_contributions(result, catalog),
+        category_point_contributions=contributions,
+        ranked_drivers=[
+            InflationDriverView(
+                category=driver.category,
+                point_contribution=driver.point_contribution,
+                share_of_net_change=driver.share_of_net_change,
+                direction=driver.direction,
+            )
+            for driver in drivers
+        ],
         current_observation_dates=current.observation_dates,
         stale_product_ids=list(current.stale_product_ids),
         data_status="Calculated from caller-supplied observations; no live prices implied.",

@@ -67,6 +67,11 @@ def test_index_endpoint_runs_the_trusted_snapshot_pipeline() -> None:
     result = response.json()
     assert float(result["level"]) > 100
     assert set(result["category_point_contributions"]) == {"protein_bars", "gym"}
+    assert [driver["category"] for driver in result["ranked_drivers"]] == [
+        "gym",
+        "protein_bars",
+    ]
+    assert all(driver["direction"] == "inflationary" for driver in result["ranked_drivers"])
     assert "no live prices implied" in result["data_status"]
 
 

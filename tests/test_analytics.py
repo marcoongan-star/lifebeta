@@ -11,6 +11,7 @@ from lifebeta import (
     category_point_contributions,
     fixed_basket_index,
     marco_catalog,
+    rank_inflation_drivers,
     select_price_snapshot,
 )
 
@@ -82,3 +83,23 @@ def test_product_contributions_roll_up_to_categories_without_losing_points() -> 
     assert categories[Category.PROTEIN_BARS] > 0
     assert categories[Category.GYM] > 0
     assert sum(categories.values(), start=Decimal("0")) == result.level - Decimal("100")
+
+
+def test_ranked_drivers_preserve_inflationary_and_deflationary_offsets() -> None:
+    contributions = {
+        Category.FAST_CASUAL: Decimal("3.0000"),
+        Category.GYM: Decimal("-1.0000"),
+    }
+    drivers = rank_inflation_drivers(contributions, total_point_change=Decimal("2.0000"))
+
+    assert [driver.category for driver in drivers] == [Category.FAST_CASUAL, Category.GYM]
+    assert drivers[0].share_of_net_change == Decimal("150.00")
+    assert drivers[0].direction == "inflationary"
+    assert drivers[1].share_of_net_change == Decimal("-50.00")
+    assert drivers[1].direction == "deflationary"
+
+
+def test_driver_shares_are_undefined_when_offsets_net_to_zero() -> None:
+    contributions = {Category.FAST_CASUAL: Decimal("1"), Category.GYM: Decimal("-1")}
+    drivers = rank_inflation_drivers(contributions, total_point_change=Decimal("0"))
+    assert all(driver.share_of_net_change is None for driver in drivers)
