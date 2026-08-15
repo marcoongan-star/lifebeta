@@ -97,3 +97,36 @@ def test_index_endpoint_reports_missing_prices_without_fabricating_them() -> Non
     assert response.status_code == 422
     assert response.json()["code"] == "missing_price"
     assert response.json()["product_ids"] == ["liverpool-home"]
+
+
+def test_benchmark_endpoint_returns_sources_and_personal_gap() -> None:
+    response = client.post(
+        "/v1/benchmark/compare",
+        json={
+            "personal_percent_change": "5",
+            "base_as_of": "2026-02-15",
+            "current_as_of": "2026-03-15",
+            "series_id": "CPI-U",
+            "observations": [
+                {
+                    "series_id": "CPI-U",
+                    "period_end": "2026-01-31",
+                    "released_on": "2026-02-10",
+                    "level": "100",
+                    "source_label": "official January release",
+                    "source_url": "https://example.gov/cpi/january",
+                },
+                {
+                    "series_id": "CPI-U",
+                    "period_end": "2026-02-28",
+                    "released_on": "2026-03-10",
+                    "level": "102",
+                    "source_label": "official February release",
+                    "source_url": "https://example.gov/cpi/february",
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["personal_minus_benchmark"] == "3.0000"
+    assert response.json()["current_snapshot"]["released_on"] == "2026-03-10"

@@ -25,8 +25,10 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Explicit missing-data and stale-data reporting.
 - Category attribution that reconciles exactly with the personal index change.
 - FastAPI catalog and personal-index endpoints with typed requests and structured missing-data errors.
+- Ranked category drivers with inflationary and deflationary offsets that reconcile to the index.
+- Release-date-aware comparison with caller-supplied, provenance-labeled CPI observations.
 
-The current test suite has twelve checks. Seeded values are examples, never claims of live prices.
+The current test suite has eighteen checks. Seeded values are examples, never claims of live prices.
 
 ## Planned stack
 
@@ -59,13 +61,14 @@ Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 | `src/lifebeta/catalog.py` | Personal products and comparable units |
 | `src/lifebeta/prices.py` | Price observations, provenance, and package normalization |
 | `src/lifebeta/analytics.py` | Trustworthy snapshots and category attribution |
+| `src/lifebeta/benchmark.py` | No-look-ahead public benchmark alignment and comparison |
 | `src/lifebeta/api.py` | Typed catalog and personal-index HTTP endpoints |
 | `src/lifebeta/index.py` | Fixed-basket index and product contributions |
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the Day 3 request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic and [Milestone 3](docs/milestone-3.md) for the API boundary.
+Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, and [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison.
 
 ## Next milestones
 

@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .benchmark import BenchmarkObservation, compare_with_benchmark
 from .analytics import (
     MissingPriceError,
     category_point_contributions,
@@ -70,6 +71,42 @@ class InflationDriverView(BaseModel):
     point_contribution: Decimal
     share_of_net_change: Decimal | None
     direction: str
+
+
+class BenchmarkObservationInput(BaseModel):
+    series_id: str = Field(min_length=1)
+    period_end: date
+    released_on: date
+    level: Decimal = Field(gt=0)
+    source_label: str = Field(min_length=1)
+    source_url: str = Field(min_length=1)
+
+
+class BenchmarkComparisonRequest(BaseModel):
+    personal_percent_change: Decimal
+    base_as_of: date
+    current_as_of: date
+    series_id: str = Field(min_length=1)
+    observations: list[BenchmarkObservationInput] = Field(min_length=1)
+
+
+class BenchmarkSnapshotView(BaseModel):
+    as_of: date
+    period_end: date
+    released_on: date
+    level: Decimal
+    source_label: str
+    source_url: str
+
+
+class BenchmarkComparisonResponse(BaseModel):
+    series_id: str
+    personal_percent_change: Decimal
+    benchmark_percent_change: Decimal
+    personal_minus_benchmark: Decimal
+    base_snapshot: BenchmarkSnapshotView
+    current_snapshot: BenchmarkSnapshotView
+    data_status: str
 
 
 def calculate_index(payload: IndexRequest) -> IndexResponse:
@@ -183,6 +220,52 @@ def create_app() -> FastAPI:
             raise
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @app.post("/v1/benchmark/compare", response_model=BenchmarkComparisonResponse)
+    def benchmark_comparison(
+        payload: BenchmarkComparisonRequest,
+    ) -> BenchmarkComparisonResponse:
+        try:
+            result = compare_with_benchmark(
+                personal_percent_change=payload.personal_percent_change,
+                base_as_of=payload.base_as_of,
+                current_as_of=payload.current_as_of,
+                series_id=payload.series_id,
+                observations=tuple(
+                    BenchmarkObservation(
+                        series_id=item.series_id,
+                        period_end=item.period_end,
+                        released_on=item.released_on,
+                        level=item.level,
+                        source_label=item.source_label,
+                        source_url=item.source_url,
+                    )
+                    for item in payload.observations
+                ),
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        def snapshot_view(snapshot) -> BenchmarkSnapshotView:  # type: ignore[no-untyped-def]
+            observation = snapshot.observation
+            return BenchmarkSnapshotView(
+                as_of=snapshot.as_of,
+                period_end=observation.period_end,
+                released_on=observation.released_on,
+                level=observation.level,
+                source_label=observation.source_label,
+                source_url=observation.source_url,
+            )
+
+        return BenchmarkComparisonResponse(
+            series_id=result.series_id,
+            personal_percent_change=result.personal_percent_change,
+            benchmark_percent_change=result.benchmark_percent_change,
+            personal_minus_benchmark=result.personal_minus_benchmark,
+            base_snapshot=snapshot_view(result.base_snapshot),
+            current_snapshot=snapshot_view(result.current_snapshot),
+            data_status="Compared only with caller-supplied, release-dated benchmark observations.",
+        )
 
     return app
 
