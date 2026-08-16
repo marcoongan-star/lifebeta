@@ -27,8 +27,9 @@ Seeded values are examples, not claims of current prices. Real observations will
 - FastAPI catalog and personal-index endpoints with typed requests and structured missing-data errors.
 - Ranked category drivers with inflationary and deflationary offsets that reconcile to the index.
 - Release-date-aware comparison with caller-supplied, provenance-labeled CPI observations.
+- Compounded real-return and purchasing-power analysis using the personal index as a deflator.
 
-The current test suite has eighteen checks. Seeded values are examples, never claims of live prices.
+The current test suite has twenty-two checks. Seeded values are examples, never claims of live prices.
 
 ## Planned stack
 
@@ -65,10 +66,11 @@ Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 | `src/lifebeta/api.py` | Typed catalog and personal-index HTTP endpoints |
 | `src/lifebeta/index.py` | Fixed-basket index and product contributions |
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
+| `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, and [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison.
+Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, and [Milestone 5](docs/milestone-5.md) for portfolio purchasing power.
 
 ## Next milestones
 

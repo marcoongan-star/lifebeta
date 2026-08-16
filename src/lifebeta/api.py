@@ -17,6 +17,7 @@ from .analytics import (
 from .catalog import Category, marco_catalog
 from .index import BasketItem, fixed_basket_index
 from .prices import ALLOWED_PROVENANCE, PriceObservation
+from .purchasing_power import analyze_purchasing_power
 
 
 class ProductView(BaseModel):
@@ -106,6 +107,25 @@ class BenchmarkComparisonResponse(BaseModel):
     personal_minus_benchmark: Decimal
     base_snapshot: BenchmarkSnapshotView
     current_snapshot: BenchmarkSnapshotView
+    data_status: str
+
+
+class PurchasingPowerRequest(BaseModel):
+    base_portfolio_value: Decimal = Field(gt=0)
+    current_portfolio_value: Decimal = Field(ge=0)
+    personal_index_level: Decimal = Field(gt=0)
+
+
+class PurchasingPowerResponse(BaseModel):
+    base_portfolio_value: Decimal
+    current_portfolio_value: Decimal
+    nominal_return_percent: Decimal
+    personal_inflation_percent: Decimal
+    real_return_percent: Decimal
+    inflation_adjusted_required_value: Decimal
+    purchasing_power_gap: Decimal
+    current_value_in_base_dollars: Decimal
+    preserved_purchasing_power: bool
     data_status: str
 
 
@@ -265,6 +285,29 @@ def create_app() -> FastAPI:
             base_snapshot=snapshot_view(result.base_snapshot),
             current_snapshot=snapshot_view(result.current_snapshot),
             data_status="Compared only with caller-supplied, release-dated benchmark observations.",
+        )
+
+    @app.post("/v1/purchasing-power", response_model=PurchasingPowerResponse)
+    def purchasing_power(payload: PurchasingPowerRequest) -> PurchasingPowerResponse:
+        try:
+            result = analyze_purchasing_power(
+                base_portfolio_value=payload.base_portfolio_value,
+                current_portfolio_value=payload.current_portfolio_value,
+                personal_index_level=payload.personal_index_level,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return PurchasingPowerResponse(
+            base_portfolio_value=result.base_portfolio_value,
+            current_portfolio_value=result.current_portfolio_value,
+            nominal_return_percent=result.nominal_return_percent,
+            personal_inflation_percent=result.personal_inflation_percent,
+            real_return_percent=result.real_return_percent,
+            inflation_adjusted_required_value=result.inflation_adjusted_required_value,
+            purchasing_power_gap=result.purchasing_power_gap,
+            current_value_in_base_dollars=result.current_value_in_base_dollars,
+            preserved_purchasing_power=result.preserved_purchasing_power,
+            data_status="Educational calculation from caller-supplied values; not investment advice.",
         )
 
     return app

@@ -130,3 +130,21 @@ def test_benchmark_endpoint_returns_sources_and_personal_gap() -> None:
     assert response.status_code == 200
     assert response.json()["personal_minus_benchmark"] == "3.0000"
     assert response.json()["current_snapshot"]["released_on"] == "2026-03-10"
+
+
+def test_purchasing_power_endpoint_explains_a_nominal_gain() -> None:
+    response = client.post(
+        "/v1/purchasing-power",
+        json={
+            "base_portfolio_value": "10000",
+            "current_portfolio_value": "10600",
+            "personal_index_level": "108",
+        },
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["nominal_return_percent"] == "6.0000"
+    assert result["real_return_percent"] == "-1.8519"
+    assert result["purchasing_power_gap"] == "-200.00"
+    assert result["preserved_purchasing_power"] is False
+    assert "not investment advice" in result["data_status"]
