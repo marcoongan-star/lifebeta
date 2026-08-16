@@ -20,6 +20,7 @@ from .benchmark import (
 from .holdings import Holding, parse_fidelity_holdings
 from .index import BasketItem, IndexResult, fixed_basket_index
 from .prices import PriceObservation, comparable_unit_price
+from .purchasing_power import PurchasingPowerResult, analyze_purchasing_power
 
 __all__ = [
     "BasketItem",
@@ -34,9 +35,11 @@ __all__ = [
     "MissingBenchmarkError",
     "PriceObservation",
     "PriceSnapshot",
+    "PurchasingPowerResult",
     "Product",
     "Unit",
     "comparable_unit_price",
+    "analyze_purchasing_power",
     "compare_with_benchmark",
     "category_point_contributions",
     "fixed_basket_index",
