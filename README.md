@@ -28,8 +28,10 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Ranked category drivers with inflationary and deflationary offsets that reconcile to the index.
 - Release-date-aware comparison with caller-supplied, provenance-labeled CPI observations.
 - Compounded real-return and purchasing-power analysis using the personal index as a deflator.
+- Durable normalized products, baskets, and provenance-aware price history.
+- Explicit opt-in storage for aggregate portfolio totals; raw Fidelity rows remain session-only.
 
-The current test suite has twenty-two checks. Seeded values are examples, never claims of live prices.
+Seeded values are examples, never claims of live prices.
 
 ## Planned stack
 
@@ -67,16 +69,16 @@ Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 | `src/lifebeta/index.py` | Fixed-basket index and product contributions |
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
+| `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, and [Milestone 5](docs/milestone-5.md) for portfolio purchasing power.
+Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, [Milestone 5](docs/milestone-5.md) for portfolio purchasing power, and [Milestone 6](docs/milestone-6.md) for the privacy boundary.
 
 ## Next milestones
 
-1. Persist products and provenance-aware price history.
-2. Persist and retrieve snapshots through the FastAPI service.
-3. Add public CPI comparison series with source citations.
-4. Build the personal contribution and portfolio-exposure interface.
+1. Add authentication and per-user ownership before accepting public personal data.
+2. Add public CPI comparison series with source citations.
+3. Build the personal contribution and portfolio-exposure interface.
 
 This project is educational and does not provide personalized investment advice.

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -18,6 +20,7 @@ from .catalog import Category, marco_catalog
 from .index import BasketItem, fixed_basket_index
 from .prices import ALLOWED_PROVENANCE, PriceObservation
 from .purchasing_power import analyze_purchasing_power
+from .store import LifeBetaStore, StoredBasket
 
 
 class ProductView(BaseModel):
@@ -129,6 +132,20 @@ class PurchasingPowerResponse(BaseModel):
     data_status: str
 
 
+class BasketSaveInput(BaseModel):
+    basket_id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    items: list[BasketItemInput] = Field(min_length=1)
+
+
+class PortfolioSaveInput(BaseModel):
+    analysis_id: str = Field(min_length=1, max_length=100)
+    base_portfolio_value: Decimal = Field(gt=0)
+    current_portfolio_value: Decimal = Field(ge=0)
+    personal_index_level: Decimal = Field(gt=0)
+    save_totals: bool = False
+
+
 def calculate_index(payload: IndexRequest) -> IndexResponse:
     if payload.base_as_of >= payload.current_as_of:
         raise ValueError("base_as_of must be before current_as_of")
@@ -197,11 +214,25 @@ def calculate_index(payload: IndexRequest) -> IndexResponse:
     )
 
 
-def create_app() -> FastAPI:
+def _basket_json(basket: StoredBasket) -> dict[str, object]:
+    return {
+        "basket_id": basket.basket_id,
+        "name": basket.name,
+        "items": [
+            {"product_id": item.product_id, "quantity": str(item.quantity)}
+            for item in basket.items
+        ],
+    }
+
+
+def create_app(database_path: str | Path | None = None) -> FastAPI:
+    resolved_path = database_path or os.getenv("LIFEBETA_DATABASE_PATH", "lifebeta.db")
+    store = LifeBetaStore(resolved_path)
+    store.upsert_products(tuple(marco_catalog().values()))
     app = FastAPI(
         title="LifeBeta API",
-        version="0.1.0",
-        description="Provenance-aware personal inflation analytics.",
+        version="0.2.0",
+        description="Provenance-aware personal inflation analytics with privacy-bounded storage.",
     )
 
     @app.exception_handler(MissingPriceError)
@@ -230,6 +261,68 @@ def create_app() -> FastAPI:
                 units_per_package=product.units_per_package,
             )
             for product in marco_catalog().values()
+        ]
+
+    @app.post("/v1/baskets", status_code=201)
+    def save_basket(payload: BasketSaveInput) -> dict[str, object]:
+        try:
+            basket = store.create_basket(
+                payload.basket_id,
+                payload.name,
+                tuple(
+                    BasketItem(item.product_id, item.quantity) for item in payload.items
+                ),
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return {
+            **_basket_json(basket),
+            "privacy": "Only normalized product identifiers and quantities were saved.",
+        }
+
+    @app.get("/v1/baskets/{basket_id}")
+    def saved_basket(basket_id: str) -> dict[str, object]:
+        try:
+            return _basket_json(store.basket(basket_id))
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="basket not found") from error
+
+    @app.post("/v1/price-observations", status_code=201)
+    def save_price_observation(payload: ObservationInput) -> dict[str, object]:
+        try:
+            observation = PriceObservation(
+                product_id=payload.product_id,
+                observed_on=payload.observed_on,
+                package_price=payload.package_price,
+                currency=payload.currency.upper(),
+                source_label=payload.source_label,
+                provenance_status=payload.provenance_status,
+            )
+            store.add_price_observation(observation)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {
+            "product_id": observation.product_id,
+            "observed_on": observation.observed_on.isoformat(),
+            "package_price": str(observation.package_price),
+            "currency": observation.currency,
+            "source_label": observation.source_label,
+            "provenance_status": observation.provenance_status,
+            "privacy": "Only the normalized observation and its provenance were saved.",
+        }
+
+    @app.get("/v1/price-observations")
+    def saved_price_observations(product_id: str | None = None) -> list[dict[str, str]]:
+        return [
+            {
+                "product_id": item.product_id,
+                "observed_on": item.observed_on.isoformat(),
+                "package_price": str(item.package_price),
+                "currency": item.currency,
+                "source_label": item.source_label,
+                "provenance_status": item.provenance_status,
+            }
+            for item in store.price_observations(product_id)
         ]
 
     @app.post("/v1/index", response_model=IndexResponse)
@@ -309,6 +402,32 @@ def create_app() -> FastAPI:
             preserved_purchasing_power=result.preserved_purchasing_power,
             data_status="Educational calculation from caller-supplied values; not investment advice.",
         )
+
+    @app.post("/v1/portfolio-totals", status_code=201)
+    def save_portfolio_totals(payload: PortfolioSaveInput) -> dict[str, object]:
+        if not payload.save_totals:
+            raise HTTPException(
+                status_code=403,
+                detail="Portfolio totals remain session-only unless save_totals is explicitly true.",
+            )
+        try:
+            saved = store.save_portfolio_totals(
+                payload.analysis_id,
+                base_value=payload.base_portfolio_value,
+                current_value=payload.current_portfolio_value,
+                personal_index_level=payload.personal_index_level,
+                consent=payload.save_totals,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return {
+            "analysis_id": saved.analysis_id,
+            "base_portfolio_value": str(saved.base_value),
+            "current_portfolio_value": str(saved.current_value),
+            "personal_index_level": str(saved.personal_index_level),
+            "created_at": saved.created_at.isoformat(),
+            "privacy": "Only aggregate totals were saved; raw Fidelity rows were not retained.",
+        }
 
     return app
 
