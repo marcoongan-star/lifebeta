@@ -22,6 +22,7 @@ from .prices import ALLOWED_PROVENANCE, PriceObservation
 from .purchasing_power import analyze_purchasing_power
 from .store import LifeBetaStore, StoredBasket
 from .saved_analysis import analyze_saved_basket
+from .quality import assess_basket_quality
 
 
 class ProductView(BaseModel):
@@ -154,6 +155,14 @@ class SavedBasketAnalysisInput(BaseModel):
     eligible_provenance: set[str] = Field(default_factory=lambda: {"verified", "user_entered"})
     stale_after_days: int = Field(default=45, ge=0)
     benchmark_series_id: str | None = Field(default=None, min_length=1)
+
+
+class BasketQualityInput(BaseModel):
+    as_of: date
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    eligible_provenance: set[str] = Field(default_factory=lambda: {"verified", "user_entered"})
+    minimum_observations: int = Field(default=2, ge=1)
+    stale_after_days: int = Field(default=45, ge=0)
 
 
 def calculate_index(payload: IndexRequest) -> IndexResponse:
@@ -435,6 +444,48 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 "current_source_url": benchmark.current_snapshot.observation.source_url,
             }
         return response
+
+    @app.post("/v1/baskets/{basket_id}/quality")
+    def basket_data_quality(
+        basket_id: str, payload: BasketQualityInput
+    ) -> dict[str, object]:
+        try:
+            report = assess_basket_quality(
+                store,
+                basket_id,
+                as_of=payload.as_of,
+                currency=payload.currency,
+                eligible_provenance=frozenset(payload.eligible_provenance),
+                minimum_observations=payload.minimum_observations,
+                stale_after_days=payload.stale_after_days,
+            )
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="basket not found") from error
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {
+            "basket_id": report.basket_id,
+            "as_of": report.as_of.isoformat(),
+            "minimum_observations": report.minimum_observations,
+            "product_count": report.product_count,
+            "ready_product_count": report.ready_product_count,
+            "coverage_percent": str(report.coverage_percent),
+            "status": report.status,
+            "products": [
+                {
+                    "product_id": item.product_id,
+                    "eligible_observation_count": item.eligible_observation_count,
+                    "distinct_source_count": item.distinct_source_count,
+                    "first_observed_on": item.first_observed_on.isoformat() if item.first_observed_on else None,
+                    "last_observed_on": item.last_observed_on.isoformat() if item.last_observed_on else None,
+                    "current_age_days": item.current_age_days,
+                    "issues": list(item.issues),
+                    "ready": item.ready,
+                }
+                for item in report.products
+            ],
+            "data_status": "Quality uses only observations available by the requested date.",
+        }
 
     @app.post("/v1/index", response_model=IndexResponse)
     def personal_index(payload: IndexRequest) -> IndexResponse:
