@@ -67,4 +67,5 @@ def test_schema_has_no_raw_import_storage(tmp_path) -> None:
         "basket_items",
         "price_observations",
         "portfolio_totals",
+        "benchmark_observations",
     }

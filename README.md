@@ -30,6 +30,8 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Compounded real-return and purchasing-power analysis using the personal index as a deflator.
 - Durable normalized products, baskets, and provenance-aware price history.
 - Explicit opt-in storage for aggregate portfolio totals; raw Fidelity rows remain session-only.
+- Saved-basket analysis that retrieves normalized price history without repeated uploads.
+- Release-date-aware comparisons using persisted, source-labeled CPI observations.
 
 Seeded values are examples, never claims of live prices.
 
@@ -73,7 +75,7 @@ Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, [Milestone 5](docs/milestone-5.md) for portfolio purchasing power, and [Milestone 6](docs/milestone-6.md) for the privacy boundary.
+Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, [Milestone 5](docs/milestone-5.md) for portfolio purchasing power, [Milestone 6](docs/milestone-6.md) for the privacy boundary, and [Milestone 7](docs/milestone-7.md) for saved analysis and released benchmarks.
 
 ## Next milestones
 

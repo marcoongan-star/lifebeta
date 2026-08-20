@@ -21,6 +21,7 @@ from .index import BasketItem, fixed_basket_index
 from .prices import ALLOWED_PROVENANCE, PriceObservation
 from .purchasing_power import analyze_purchasing_power
 from .store import LifeBetaStore, StoredBasket
+from .saved_analysis import analyze_saved_basket
 
 
 class ProductView(BaseModel):
@@ -144,6 +145,15 @@ class PortfolioSaveInput(BaseModel):
     current_portfolio_value: Decimal = Field(ge=0)
     personal_index_level: Decimal = Field(gt=0)
     save_totals: bool = False
+
+
+class SavedBasketAnalysisInput(BaseModel):
+    base_as_of: date
+    current_as_of: date
+    currency: str = Field(default="USD", min_length=3, max_length=3)
+    eligible_provenance: set[str] = Field(default_factory=lambda: {"verified", "user_entered"})
+    stale_after_days: int = Field(default=45, ge=0)
+    benchmark_series_id: str | None = Field(default=None, min_length=1)
 
 
 def calculate_index(payload: IndexRequest) -> IndexResponse:
@@ -324,6 +334,107 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             }
             for item in store.price_observations(product_id)
         ]
+
+    @app.post("/v1/benchmark-observations", status_code=201)
+    def save_benchmark_observation(
+        payload: BenchmarkObservationInput,
+    ) -> dict[str, str]:
+        try:
+            observation = BenchmarkObservation(
+                series_id=payload.series_id,
+                period_end=payload.period_end,
+                released_on=payload.released_on,
+                level=payload.level,
+                source_label=payload.source_label,
+                source_url=payload.source_url,
+            )
+            store.add_benchmark_observation(observation)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {
+            "series_id": observation.series_id,
+            "period_end": observation.period_end.isoformat(),
+            "released_on": observation.released_on.isoformat(),
+            "level": str(observation.level),
+            "source_label": observation.source_label,
+            "source_url": observation.source_url,
+            "data_status": "Stored caller-supplied benchmark with release-date provenance.",
+        }
+
+    @app.post("/v1/baskets/{basket_id}/analysis")
+    def analyze_persisted_basket(
+        basket_id: str, payload: SavedBasketAnalysisInput
+    ) -> dict[str, object]:
+        try:
+            analysis = analyze_saved_basket(
+                store,
+                basket_id,
+                base_as_of=payload.base_as_of,
+                current_as_of=payload.current_as_of,
+                currency=payload.currency,
+                eligible_provenance=frozenset(payload.eligible_provenance),
+                stale_after_days=payload.stale_after_days,
+            )
+            benchmark = None
+            if payload.benchmark_series_id:
+                benchmark = compare_with_benchmark(
+                    personal_percent_change=analysis.index_result.level - Decimal("100"),
+                    base_as_of=payload.base_as_of,
+                    current_as_of=payload.current_as_of,
+                    series_id=payload.benchmark_series_id,
+                    observations=store.benchmark_observations(payload.benchmark_series_id),
+                )
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="basket not found") from error
+        except MissingPriceError:
+            raise
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        response: dict[str, object] = {
+            "basket": _basket_json(analysis.basket),
+            "base_as_of": analysis.base_as_of.isoformat(),
+            "current_as_of": analysis.current_as_of.isoformat(),
+            "currency": analysis.currency,
+            "level": str(analysis.index_result.level),
+            "percent_change": str(analysis.index_result.level - Decimal("100")),
+            "base_cost": str(analysis.index_result.base_cost),
+            "current_cost": str(analysis.index_result.current_cost),
+            "category_point_contributions": {
+                category.value: str(value)
+                for category, value in analysis.category_contributions.items()
+            },
+            "ranked_drivers": [
+                {
+                    "category": driver.category.value,
+                    "point_contribution": str(driver.point_contribution),
+                    "share_of_net_change": (
+                        str(driver.share_of_net_change)
+                        if driver.share_of_net_change is not None
+                        else None
+                    ),
+                    "direction": driver.direction,
+                }
+                for driver in analysis.ranked_drivers
+            ],
+            "current_observation_dates": {
+                product_id: observed_on.isoformat()
+                for product_id, observed_on in analysis.current_snapshot.observation_dates.items()
+            },
+            "stale_product_ids": list(analysis.current_snapshot.stale_product_ids),
+            "data_status": "Calculated from saved normalized observations; no live prices implied.",
+        }
+        if benchmark is not None:
+            response["benchmark"] = {
+                "series_id": benchmark.series_id,
+                "benchmark_percent_change": str(benchmark.benchmark_percent_change),
+                "personal_minus_benchmark": str(benchmark.personal_minus_benchmark),
+                "base_period_end": benchmark.base_snapshot.observation.period_end.isoformat(),
+                "current_period_end": benchmark.current_snapshot.observation.period_end.isoformat(),
+                "current_source_label": benchmark.current_snapshot.observation.source_label,
+                "current_source_url": benchmark.current_snapshot.observation.source_url,
+            }
+        return response
 
     @app.post("/v1/index", response_model=IndexResponse)
     def personal_index(payload: IndexRequest) -> IndexResponse:

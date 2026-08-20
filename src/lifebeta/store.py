@@ -9,6 +9,7 @@ from pathlib import Path
 from .catalog import Category, Product, Unit
 from .index import BasketItem
 from .prices import PriceObservation
+from .benchmark import BenchmarkObservation
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,16 @@ class LifeBetaStore:
                     current_value TEXT NOT NULL,
                     personal_index_level TEXT NOT NULL,
                     created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS benchmark_observations (
+                    observation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    series_id TEXT NOT NULL,
+                    period_end TEXT NOT NULL,
+                    released_on TEXT NOT NULL,
+                    level TEXT NOT NULL,
+                    source_label TEXT NOT NULL,
+                    source_url TEXT NOT NULL,
+                    UNIQUE (series_id, period_end, released_on)
                 );
                 """
             )
@@ -206,6 +217,50 @@ class LifeBetaStore:
                 currency=row["currency"],
                 source_label=row["source_label"],
                 provenance_status=row["provenance_status"],
+            )
+            for row in rows
+        )
+
+    def add_benchmark_observation(self, observation: BenchmarkObservation) -> None:
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    """
+                    INSERT INTO benchmark_observations
+                    (series_id, period_end, released_on, level, source_label, source_url)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        observation.series_id,
+                        observation.period_end.isoformat(),
+                        observation.released_on.isoformat(),
+                        str(observation.level),
+                        observation.source_label,
+                        observation.source_url,
+                    ),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError("duplicate benchmark observation") from error
+
+    def benchmark_observations(
+        self, series_id: str | None = None
+    ) -> tuple[BenchmarkObservation, ...]:
+        query = "SELECT * FROM benchmark_observations"
+        parameters: tuple[str, ...] = ()
+        if series_id is not None:
+            query += " WHERE series_id = ?"
+            parameters = (series_id,)
+        query += " ORDER BY period_end, released_on"
+        with self._connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return tuple(
+            BenchmarkObservation(
+                series_id=row["series_id"],
+                period_end=date.fromisoformat(row["period_end"]),
+                released_on=date.fromisoformat(row["released_on"]),
+                level=Decimal(row["level"]),
+                source_label=row["source_label"],
+                source_url=row["source_url"],
             )
             for row in rows
         )
