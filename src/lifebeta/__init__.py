@@ -21,6 +21,7 @@ from .holdings import Holding, parse_fidelity_holdings
 from .index import BasketItem, IndexResult, fixed_basket_index
 from .prices import PriceObservation, comparable_unit_price
 from .purchasing_power import PurchasingPowerResult, analyze_purchasing_power
+from .saved_analysis import SavedBasketAnalysis, analyze_saved_basket
 from .store import LifeBetaStore, PortfolioTotals, StoredBasket
 
 __all__ = [
@@ -39,11 +40,13 @@ __all__ = [
     "PriceSnapshot",
     "PortfolioTotals",
     "PurchasingPowerResult",
+    "SavedBasketAnalysis",
     "Product",
     "StoredBasket",
     "Unit",
     "comparable_unit_price",
     "analyze_purchasing_power",
+    "analyze_saved_basket",
     "compare_with_benchmark",
     "category_point_contributions",
     "fixed_basket_index",
