@@ -33,14 +33,15 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Saved-basket analysis that retrieves normalized price history without repeated uploads.
 - Release-date-aware comparisons using persisted, source-labeled CPI observations.
 - No-look-ahead basket quality reports for history depth, freshness, and source concentration.
+- A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
 
 Seeded values are examples, never claims of live prices.
 
-## Planned stack
+## Stack
 
 - Python, Polars/pandas, NumPy and statsmodels for transparent analytics.
 - FastAPI for catalog, index and experiment APIs.
-- React/TypeScript for contribution and comparison views.
+- React 19, TypeScript, and vinext for contribution and comparison views and a free public build.
 - PostgreSQL for effective-dated baskets and provenance-aware observations.
 - pytest, Docker and GitHub Actions for repeatable validation.
 
@@ -60,6 +61,16 @@ Start the local API with:
 
 Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 
+Start the public interface in a second terminal:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Open `http://localhost:3000`. Switch to **Matchday Kit** to see why a missing Liverpool jersey observation blocks the index; **Training Day** demonstrates a non-blocking stale-price warning.
+
 ## Repository map
 
 | Area | Purpose |
@@ -73,6 +84,8 @@ Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
+| `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
+| `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
@@ -82,6 +95,6 @@ Start with `tests/test_api.py` to understand the HTTP request flow. See [Milesto
 
 1. Add authentication and per-user ownership before accepting public personal data.
 2. Add public CPI comparison series with source citations.
-3. Build the personal contribution and portfolio-exposure interface.
+3. Connect the public seeded adapter to authenticated saved-basket API reads.
 
 This project is educational and does not provide personalized investment advice.
