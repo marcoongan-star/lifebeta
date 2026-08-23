@@ -148,3 +148,23 @@ def test_purchasing_power_endpoint_explains_a_nominal_gain() -> None:
     assert result["purchasing_power_gap"] == "-200.00"
     assert result["preserved_purchasing_power"] is False
     assert "not investment advice" in result["data_status"]
+
+
+def test_food_affordability_endpoint_exposes_the_student_budget_tradeoff() -> None:
+    response = client.post(
+        "/v1/food-affordability",
+        json={
+            "base_meal_price": "10.00",
+            "current_meal_price": "12.50",
+            "weekly_food_budget": "75.00",
+            "planned_meals_per_week": 7,
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["meal_price_change_percent"] == "25.0000"
+    assert result["current_meals_affordable"] == "6.00"
+    assert result["weekly_shortfall"] == "12.50"
+    assert result["budget_covers_plan"] is False
+    assert "no live restaurant price implied" in result["data_status"]
