@@ -17,7 +17,7 @@ const dealPreviews = [
   { place: "Lexington Slice", title: "10% with valid student ID", source: "Student submitted", status: "Pending moderation", tone: "pending" },
 ];
 
-export function BaroqueExplorer() {
+export function BarokeExplorer() {
   const [maxPrice, setMaxPrice] = useState(12);
   const [maxDistance, setMaxDistance] = useState(1);
   const [discountOnly, setDiscountOnly] = useState(false);
@@ -55,7 +55,7 @@ export function BaroqueExplorer() {
       </section>
 
       <section className="submit-section" id="submit">
-        <div><span>COMMUNITY SIGNAL</span><h2>Students find the deals first.</h2><p>Baroque will let students submit a deal, but submissions will remain pending until a moderator or trusted source verifies the terms and expiration.</p></div>
+        <div><span>COMMUNITY SIGNAL</span><h2>Students find the deals first.</h2><p>Baroke will let students submit a deal, but submissions will remain pending until a moderator or trusted source verifies the terms and expiration.</p></div>
         {submission ? <div className="submission-success"><span>✓</span><strong>Preview submission captured on this device.</strong><p>No data was sent or saved. Production submissions will require authentication, moderation, and an audit trail.</p><button onClick={() => setSubmission(false)}>Submit another preview</button></div> : <form onSubmit={(event) => { event.preventDefault(); setSubmission(true); }}><label>PLACE<input required placeholder="Restaurant or store" /></label><label>DEAL DETAILS<textarea required placeholder="What is the deal, and what proof did you see?" /></label><label>EXPIRATION, IF KNOWN<input type="date" /></label><button type="submit">Preview submission →</button><small>Device-only demonstration · nothing is uploaded</small></form>}
       </section>
     </>

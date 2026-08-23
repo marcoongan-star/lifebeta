@@ -43,7 +43,7 @@ export function InflationTracker() {
 
   return (
     <main className="life-shell">
-      <header className="life-nav"><Link href="/tracker" className="life-brand"><span>β</span><strong>LIFEBETA</strong></Link><nav><Link href="/">Baroque</Link><a href="#basket">My basket</a><a href="#method">Method</a></nav><div className="privacy-chip">PRIVATE BY DEFAULT</div></header>
+      <header className="life-nav"><Link href="/tracker" className="life-brand"><span>β</span><strong>LIFEBETA</strong></Link><nav><Link href="/">Baroke</Link><a href="#basket">My basket</a><a href="#method">Method</a></nav><div className="privacy-chip">PRIVATE BY DEFAULT</div></header>
 
       <section className="life-hero" id="top">
         <div><p>YOUR COST OF LIVING · MEASURED</p><h1>Inflation is personal.<br /><em>Track yours.</em></h1><span>Build an index from the food, gym, jerseys, clothes, and subscriptions you actually buy—then compare it with released CPI.</span></div>

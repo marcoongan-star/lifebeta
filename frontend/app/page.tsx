@@ -9,17 +9,17 @@ export async function generateMetadata(): Promise<Metadata> {
   const image = `${protocol}://${host}/baroque-social-card.png`;
 
   return {
-    title: "Baroque — Baruch Student Eats, powered by LifeBeta",
+    title: "Baroke — Baruch Student Eats, powered by LifeBeta",
     description: "Find affordable food, student discounts, and verified deals around Baruch—backed by transparent food-inflation data.",
     openGraph: {
-      title: "Baroque — Baruch Student Eats",
+      title: "Baroke — Baruch Student Eats",
       description: "The city got expensive. Lunch shouldn't.",
       type: "website",
-      images: [{ url: image, width: 900, height: 472, alt: "Baroque — Baruch Student Eats" }],
+      images: [{ url: image, width: 900, height: 472, alt: "Baroke — Baruch Student Eats" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Baroque — Baruch Student Eats",
+      title: "Baroke — Baruch Student Eats",
       description: "The city got expensive. Lunch shouldn't.",
       images: [image],
     },

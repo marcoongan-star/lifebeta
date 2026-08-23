@@ -1,10 +1,10 @@
-# Baroque transition design
+# Baroke transition design
 
 ## Product boundary
 
 LifeBeta is the evidence layer. It explains how price changes affect a student's weekly food budget and preserves the provenance, units, effective dates, and quality state behind every calculation.
 
-Baroque is the action layer. It will help Baruch students find an affordable meal nearby, identify student discounts, and judge whether a deal is still trustworthy. The public landing page connects the two products without claiming that the current seeded restaurant cards are live data.
+Baroke is the action layer. It will help Baruch students find an affordable meal nearby, identify student discounts, and judge whether a deal is still trustworthy. The public landing page connects the two products without claiming that the current seeded restaurant cards are live data.
 
 ## Current request flow
 
@@ -68,7 +68,7 @@ PostgreSQL can start with indexed latitude and longitude columns. If the dataset
 - Public visitors can browse without an account.
 - Submitting or reporting a deal requires authentication and rate limiting.
 - Moderation records are append-only audit events, not silent overwrites.
-- Personal financial imports remain outside Baroque. LifeBeta never needs raw Fidelity holdings to calculate food affordability.
+- Personal financial imports remain outside Baroke. LifeBeta never needs raw Fidelity holdings to calculate food affordability.
 - A source URL alone is insufficient: the system also stores what was observed and when.
 
 ## Failure modes

@@ -1,10 +1,10 @@
-# LifeBeta + Baroque
+# LifeBeta + Baroke
 
 A provenance-aware inflation evidence layer and a student-food product preview.
 
-LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroque turns the food-affordability evidence into an upcoming Baruch student product: cheap meal discovery, price and distance filters, student discounts, and deals with visible verification states.
+LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into an upcoming Baruch student product: cheap meal discovery, price and distance filters, student discounts, and deals with visible verification states.
 
-LifeBeta measures the problem. Baroque helps students act. The current Baroque restaurant listings, coordinates, and deal cards are seeded product demonstrations, not current prices or active offers.
+LifeBeta measures the problem. Baroke helps students act. The current Baroke restaurant listings, coordinates, and deal cards are seeded product demonstrations, not current prices or active offers.
 
 ## Marco's seeded basket
 
@@ -37,7 +37,7 @@ Seeded values are examples, not claims of current prices. Real observations will
 - No-look-ahead basket quality reports for history depth, freshness, and source concentration.
 - A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
 - A tested meal-affordability model that translates price growth into meals lost, budget share, and weekly shortfall.
-- A public Baroque launch story with an interactive budget lab, seeded food-map filters, deal verification states, and a device-only submission preview.
+- A public Baroke launch story with an interactive budget lab, seeded food-map filters, deal verification states, and a device-only submission preview.
 
 Seeded values are examples, never claims of live prices.
 
@@ -73,7 +73,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000` for Baroque. Open `http://localhost:3000/tracker` for the LifeBeta evidence layer; switch to **Matchday Kit** to see why a missing Liverpool jersey observation blocks the index, while **Training Day** demonstrates a non-blocking stale-price warning.
+Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` for the LifeBeta evidence layer; switch to **Matchday Kit** to see why a missing Liverpool jersey observation blocks the index, while **Training Day** demonstrates a non-blocking stale-price warning.
 
 ## Repository map
 
@@ -89,14 +89,14 @@ Open `http://localhost:3000` for Baroque. Open `http://localhost:3000/tracker` f
 | `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
 | `src/lifebeta/food_affordability.py` | Meals affordable, meals lost, and weekly budget shortfall |
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
-| `frontend/app/student-eats-landing.tsx` | Baroque launch story and evidence-to-action product boundary |
+| `frontend/app/student-eats-landing.tsx` | Baroke launch story and evidence-to-action product boundary |
 | `frontend/app/baroque-explorer.tsx` | Interactive budget, search, map, deals, and submission previews |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroque transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. The numbered milestone documents explain the existing LifeBeta analytics in order.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. The numbered milestone documents explain the existing LifeBeta analytics in order.
 
 ## Next milestones
 

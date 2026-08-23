@@ -22,13 +22,13 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the Baroque student food launch story", async () => {
+test("server-renders the Baroke student food launch story", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Baroque — Baruch Student Eats, powered by LifeBeta<\/title>/i);
+  assert.match(html, /<title>Baroke — Baruch Student Eats, powered by LifeBeta<\/title>/i);
   assert.match(html, /The city got expensive/);
   assert.match(html, /\+37\.3%/);
   assert.match(html, /Seeded demonstration listings/i);
