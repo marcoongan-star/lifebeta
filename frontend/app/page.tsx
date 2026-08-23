@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Baroque — Baruch Student Eats",
       description: "The city got expensive. Lunch shouldn't.",
       type: "website",
-      images: [{ url: image, width: 1731, height: 909, alt: "Baroque — Baruch Student Eats" }],
+      images: [{ url: image, width: 900, height: 472, alt: "Baroque — Baruch Student Eats" }],
     },
     twitter: {
       card: "summary_large_image",
