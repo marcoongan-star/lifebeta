@@ -1,8 +1,10 @@
-# LifeBeta
+# LifeBeta + Baroque
 
-A provenance-aware personal inflation index and portfolio-exposure laboratory.
+A provenance-aware inflation evidence layer and a student-food product preview.
 
-LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. It is inspired by the useful personal-finance premise of the discontinued startup Wesabe, improved with explicit provenance, package-size normalization, privacy-conscious imports and quantitative diagnostics.
+LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroque turns the food-affordability evidence into an upcoming Baruch student product: cheap meal discovery, price and distance filters, student discounts, and deals with visible verification states.
+
+LifeBeta measures the problem. Baroque helps students act. The current Baroque restaurant listings, coordinates, and deal cards are seeded product demonstrations, not current prices or active offers.
 
 ## Marco's seeded basket
 
@@ -34,6 +36,8 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Release-date-aware comparisons using persisted, source-labeled CPI observations.
 - No-look-ahead basket quality reports for history depth, freshness, and source concentration.
 - A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
+- A tested meal-affordability model that translates price growth into meals lost, budget share, and weekly shortfall.
+- A public Baroque launch story with an interactive budget lab, seeded food-map filters, deal verification states, and a device-only submission preview.
 
 Seeded values are examples, never claims of live prices.
 
@@ -69,7 +73,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`. Switch to **Matchday Kit** to see why a missing Liverpool jersey observation blocks the index; **Training Day** demonstrates a non-blocking stale-price warning.
+Open `http://localhost:3000` for Baroque. Open `http://localhost:3000/tracker` for the LifeBeta evidence layer; switch to **Matchday Kit** to see why a missing Liverpool jersey observation blocks the index, while **Training Day** demonstrates a non-blocking stale-price warning.
 
 ## Repository map
 
@@ -83,18 +87,21 @@ Open `http://localhost:3000`. Switch to **Matchday Kit** to see why a missing Li
 | `src/lifebeta/index.py` | Fixed-basket index and product contributions |
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
+| `src/lifebeta/food_affordability.py` | Meals affordable, meals lost, and weekly budget shortfall |
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
+| `frontend/app/student-eats-landing.tsx` | Baroque launch story and evidence-to-action product boundary |
+| `frontend/app/baroque-explorer.tsx` | Interactive budget, search, map, deals, and submission previews |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, [Milestone 5](docs/milestone-5.md) for portfolio purchasing power, [Milestone 6](docs/milestone-6.md) for the privacy boundary, [Milestone 7](docs/milestone-7.md) for saved analysis and released benchmarks, and [Milestone 8](docs/milestone-8.md) for coverage diagnostics.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroque transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. The numbered milestone documents explain the existing LifeBeta analytics in order.
 
 ## Next milestones
 
-1. Add authentication and per-user ownership before accepting public personal data.
-2. Add public CPI comparison series with source citations.
-3. Connect the public seeded adapter to authenticated saved-basket API reads.
+1. Build a small, manually verified Baruch-area place and meal dataset with provenance.
+2. Add geospatial search and return observation dates with every price.
+3. Add authenticated student submissions, moderation audit events, and automatic deal expiry.
 
 This project is educational and does not provide personalized investment advice.
