@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 
 type Product = { name: string; detail: string; category: string; start: number; current: number | null; age: number; weight: number };
 type Basket = { id: string; name: string; period: string; cpi: number; products: Product[] };
@@ -31,18 +32,18 @@ export function InflationTracker() {
   const basket = baskets.find((item) => item.id === basketId) ?? baskets[0];
   const missing = basket.products.filter((product) => product.current === null);
   const stale = basket.products.filter((product) => product.current !== null && product.age > 45);
-  const inflation = useMemo(() => {
+  const inflation = (() => {
     if (missing.length) return null;
     const weighted = basket.products.reduce((total, product) => {
       const change = ((product.current! / product.start) - 1) * 100;
       return total + change * (base === "equal" ? 1 / basket.products.length : product.weight / 100);
     }, 0);
     return weighted;
-  }, [base, basket, missing.length]);
+  })();
 
   return (
     <main className="life-shell">
-      <header className="life-nav"><a href="#top" className="life-brand"><span>β</span><strong>LIFEBETA</strong></a><nav><a href="#basket">My basket</a><a href="#method">Method</a></nav><div className="privacy-chip">PRIVATE BY DEFAULT</div></header>
+      <header className="life-nav"><Link href="/tracker" className="life-brand"><span>β</span><strong>LIFEBETA</strong></Link><nav><Link href="/">Baroque</Link><a href="#basket">My basket</a><a href="#method">Method</a></nav><div className="privacy-chip">PRIVATE BY DEFAULT</div></header>
 
       <section className="life-hero" id="top">
         <div><p>YOUR COST OF LIVING · MEASURED</p><h1>Inflation is personal.<br /><em>Track yours.</em></h1><span>Build an index from the food, gym, jerseys, clothes, and subscriptions you actually buy—then compare it with released CPI.</span></div>
