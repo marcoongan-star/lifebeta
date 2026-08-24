@@ -1,4 +1,4 @@
-# LifeBeta contributor guide
+# Baroke and LifeBeta contributor guide
 
 Marco owns the product, basket and privacy decisions. Codex implements, validates and explains them.
 
@@ -10,6 +10,8 @@ Marco owns the product, basket and privacy decisions. Codex implements, validate
 - Fidelity CSV imports are session-only in the MVP. Never persist raw rows, log file contents or silently upload them.
 - Seeded observations must never be presented as current or live prices.
 - Unit normalization must occur before comparing packages, subscriptions or currencies.
+- Baroke is the student food discovery layer; LifeBeta remains its inflation-evidence layer.
+- Baroke place and deal previews remain explicitly seeded until every current claim has source and observation-date provenance.
 
 ## Working style
 
@@ -18,4 +20,3 @@ Marco owns the product, basket and privacy decisions. Codex implements, validate
 - Use decimal arithmetic for prices, quantities and index reconciliation.
 - Treat minimum sample sizes, uncertainty and no-look-ahead alignment as correctness requirements.
 - Prefer small milestones Marco can later modify and explain.
-

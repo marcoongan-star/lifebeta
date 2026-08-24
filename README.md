@@ -38,6 +38,7 @@ Seeded values are examples, not claims of current prices. Real observations will
 - A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
 - A tested meal-affordability model that translates price growth into meals lost, budget share, and weekly shortfall.
 - A public Baroke launch story with an interactive budget lab, seeded food-map filters, deal verification states, and a device-only submission preview.
+- A typed Baroke place-search API with price, distance, student-discount, and provenance fields plus a resilient seeded frontend fallback.
 
 Seeded values are examples, never claims of live prices.
 
@@ -88,15 +89,17 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
 | `src/lifebeta/food_affordability.py` | Meals affordable, meals lost, and weekly budget shortfall |
+| `src/lifebeta/student_food.py` | Typed Baroke place records and deterministic search filters |
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
 | `frontend/app/student-eats-landing.tsx` | Baroke launch story and evidence-to-action product boundary |
 | `frontend/app/baroque-explorer.tsx` | Interactive budget, search, map, deals, and submission previews |
+| `frontend/app/baroke-api.ts` | Typed API adapter and explicitly seeded fallback records |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. The numbered milestone documents explain the existing LifeBeta analytics in order.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 9](docs/milestone-9.md) explains the first implemented Baroke search boundary; the earlier numbered documents explain the LifeBeta analytics in order.
 
 ## Next milestones
 
