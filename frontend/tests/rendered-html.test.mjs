@@ -33,9 +33,14 @@ test("server-renders the simplified Baroke place experience", async () => {
   assert.match(html, /\+37\.3%/);
   assert.match(html, /MEAL PRICE THEN/i);
   assert.match(html, /MEALS LOST \/ WEEK/i);
-  assert.match(html, /Only manually verified places/i);
+  assert.match(html, /Confirmed deals/i);
+  assert.match(html, /SOURCE-CHECKED AUGUST 24, 2026/i);
   assert.match(html, /Add a place/i);
-  assert.match(html, /Submission is not publication/i);
+  assert.match(html, /MEAL PRICE/i);
+  assert.match(html, /class="hero-proof"><span>POWERED BY LIFEBETA<\/span>/i);
+  assert.doesNotMatch(html, /<small>POWERED BY LIFEBETA<\/small>/i);
+  assert.doesNotMatch(html, /Only manually verified places/i);
+  assert.doesNotMatch(html, /These fixed base metrics/i);
   assert.doesNotMatch(html, /BARUCH STUDENT EATS/i);
   assert.doesNotMatch(html, /INTERACTIVE PRODUCT PREVIEW/i);
   assert.doesNotMatch(html, /A code is only useful/i);

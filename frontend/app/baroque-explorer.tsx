@@ -1,17 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { loadBarokePlaces, submitBarokePlace, type BarokePlace } from "./baroke-api";
+import {
+  loadBarokeDeals,
+  loadBarokePlaces,
+  submitBarokePlace,
+  type BarokeDeal,
+  type BarokePlace,
+} from "./baroke-api";
 
 type DatabaseState = "loading" | "ready" | "unavailable";
 type SubmissionState = "idle" | "saving" | "saved" | "error";
 
+function formatDealDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${value}T12:00:00Z`));
+}
+
 export function BarokeExplorer() {
   const [places, setPlaces] = useState<BarokePlace[]>([]);
+  const [deals, setDeals] = useState<BarokeDeal[]>([]);
   const [maxPrice, setMaxPrice] = useState(12);
   const [location, setLocation] = useState("");
   const [discountOnly, setDiscountOnly] = useState(false);
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
+  const [dealState, setDealState] = useState<DatabaseState>("loading");
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [submissionMessage, setSubmissionMessage] = useState("");
 
@@ -31,6 +44,12 @@ export function BarokeExplorer() {
         setDatabaseState("ready");
       })
       .catch(() => setDatabaseState("unavailable"));
+    loadBarokeDeals(controller.signal)
+      .then((next) => {
+        setDeals(next);
+        setDealState("ready");
+      })
+      .catch(() => setDealState("unavailable"));
     return () => controller.abort();
   }, []);
 
@@ -45,8 +64,7 @@ export function BarokeExplorer() {
         name: String(data.get("name") ?? ""),
         meal_name: String(data.get("meal_name") ?? ""),
         cuisine: String(data.get("cuisine") ?? ""),
-        price_min: Number(data.get("price_min")),
-        price_max: Number(data.get("price_max")),
+        meal_price: Number(data.get("meal_price")),
         address: String(data.get("address") ?? ""),
         location_note: String(data.get("location_note") ?? ""),
         student_discount: data.get("student_discount") === "on",
@@ -54,7 +72,7 @@ export function BarokeExplorer() {
       });
       form.reset();
       setSubmissionState("saved");
-      setSubmissionMessage("Saved for review. It will not appear publicly until its price and location are verified.");
+      setSubmissionMessage("Saved for Codex review. It will not appear publicly until I check its price and location during a Baroke work session.");
     } catch (error) {
       setSubmissionState("error");
       setSubmissionMessage(error instanceof Error ? error.message : "Place could not be saved.");
@@ -66,7 +84,6 @@ export function BarokeExplorer() {
       <section className="explore-section" id="places">
         <div className="baroque-section-head">
           <div><h2>Find lunch between classes.</h2></div>
-          <p>Only manually verified places appear here. Prices return to review after 24 hours without a fresh check.</p>
         </div>
         <div className="filter-bar">
           <fieldset><legend>MEAL PRICE</legend>{[8, 12, 16].map((price) => <button type="button" className={maxPrice === price ? "active" : ""} onClick={() => setMaxPrice(price)} key={price}>Up to ${price}</button>)}</fieldset>
@@ -82,8 +99,8 @@ export function BarokeExplorer() {
             {databaseState === "ready" && filtered.length === 0 && <div className="no-matches"><strong>No verified matches yet.</strong><p>Add a place below. New submissions stay private until they pass review.</p></div>}
             {databaseState === "ready" && filtered.map((place) => (
               <article className="verified-place" key={place.id}>
-                <span className="place-price">${place.priceMin.toFixed(0)}–${place.priceMax.toFixed(0)}<small>meal price</small></span>
-                <div><small>{place.cuisine} · {place.address}</small><strong>{place.name}</strong><p>{place.mealName} · {place.locationNote}</p></div>
+                <span className="place-price">{place.priceMin === place.priceMax ? `$${place.priceMin.toFixed(0)}` : `$${place.priceMin.toFixed(0)}–$${place.priceMax.toFixed(0)}`}<small>meal price</small></span>
+                <div><small>{place.cuisine} · {place.address}</small><strong>{place.name}</strong><p>{[place.mealName, place.locationNote].filter(Boolean).join(" · ")}</p></div>
                 <div className="place-badges">{place.studentDiscount && <i>STUDENT DISCOUNT</i>}<i>VERIFIED</i></div>
               </article>
             ))}
@@ -91,26 +108,51 @@ export function BarokeExplorer() {
           <aside className="verification-panel">
             <small>HOW VERIFICATION WORKS</small>
             <ol>
-              <li><span>1</span><p>A student adds the place, meal, price range, location, and evidence.</p></li>
-              <li><span>2</span><p>The submission stays pending while its menu or receipt evidence is checked.</p></li>
+              <li><span>1</span><p>A student adds the place, cuisine, meal price, and address. Extra details are optional.</p></li>
+              <li><span>2</span><p>Codex checks the submitted source or receipt during a Baroke review session.</p></li>
               <li><span>3</span><p>Only verified records become public search results.</p></li>
-              <li><span>4</span><p>A daily freshness sweep returns old prices to review instead of presenting them as current.</p></li>
+              <li><span>4</span><p>Recheck dates hide stale records until Codex reviews them again.</p></li>
             </ol>
           </aside>
         </div>
       </section>
 
+      <section className="deals-section" id="deals">
+        <div className="baroque-section-head inverse">
+          <div><span>SOURCE-CHECKED AUGUST 24, 2026</span><h2>Confirmed deals.</h2></div>
+          <p>Terms and participation can vary by location. Open the original source before ordering.</p>
+        </div>
+        <div className="deal-grid">
+          {dealState === "loading" && <div className="deal-empty"><strong>Loading confirmed deals…</strong></div>}
+          {dealState === "unavailable" && <div className="deal-empty"><strong>Deals are temporarily unavailable.</strong><p>Try again shortly.</p></div>}
+          {dealState === "ready" && deals.length === 0 && <div className="deal-empty"><strong>No current confirmed deals.</strong><p>Offers with expired or overdue checks are hidden automatically.</p></div>}
+          {dealState === "ready" && deals.map((deal, index) => (
+            <article key={deal.id}>
+              <span className="deal-number">{String(index + 1).padStart(2, "0")}</span>
+              <small>{deal.brand}</small>
+              <h3>{deal.title}</h3>
+              <p>{deal.details}</p>
+              <p className="deal-terms">{deal.requirement}</p>
+              <div className="deal-meta">
+                <i>CONFIRMED</i>
+                <a href={deal.sourceUrl} target="_blank" rel="noreferrer">Original source ↗</a>
+              </div>
+              <span className="deal-validity">{deal.expiresAt ? `Ends ${formatDealDate(deal.expiresAt)}` : `Recheck by ${formatDealDate(deal.checkAfter)}`}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="submit-section" id="add-place">
-        <div><h2>Add a place.</h2><p>Help build the database with a real meal, price range, and exact location. Submission is not publication: every record begins as pending.</p></div>
+        <div><h2>Add a place.</h2><p>Add a place and the price you paid or saw. Optional details help me verify it during our next Baroke work session.</p></div>
         <form onSubmit={handleSubmit}>
           <label>PLACE<input name="name" required placeholder="Restaurant or store" /></label>
-          <label>MEAL OR ITEM<input name="meal_name" required placeholder="Chicken bowl, lunch special…" /></label>
           <label>CUISINE<input name="cuisine" required placeholder="Mexican, deli, pizza…" /></label>
-          <label>MINIMUM MEAL PRICE<input name="price_min" required type="number" min="0.01" step="0.01" placeholder="8.00" /></label>
-          <label>MAXIMUM MEAL PRICE<input name="price_max" required type="number" min="0.01" step="0.01" placeholder="12.00" /></label>
+          <label>MEAL PRICE<input name="meal_price" required type="number" min="0.01" step="0.01" placeholder="10.00" /></label>
           <label className="form-wide">ADDRESS<input name="address" required placeholder="Street address" /></label>
-          <label className="form-wide">LOCATION DETAILS<input name="location_note" required placeholder="Cross streets, neighborhood, or walking landmark" /></label>
-          <label className="form-wide">MENU OR RECEIPT LINK<input name="source_url" required type="url" placeholder="https://…" /></label>
+          <label>MEAL OR ITEM · OPTIONAL<input name="meal_name" placeholder="Chicken bowl, lunch special…" /></label>
+          <label>LOCATION DETAILS · OPTIONAL<input name="location_note" placeholder="Neighborhood or walking landmark" /></label>
+          <label className="form-wide">MENU OR RECEIPT LINK · OPTIONAL<input name="source_url" type="url" placeholder="https://…" /></label>
           <label className="form-check"><input name="student_discount" type="checkbox" />This place offers a student discount</label>
           <button type="submit" disabled={submissionState === "saving"}>{submissionState === "saving" ? "Saving…" : "Submit for verification →"}</button>
           {submissionMessage && <p className={submissionState === "error" ? "form-message error" : "form-message"}>{submissionMessage}</p>}
