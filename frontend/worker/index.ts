@@ -4,10 +4,14 @@ import handler from "vinext/server/app-router-entry";
 import {
   createDealsStatusIndex,
   createDealsTable,
+  createPlaceDealsLookupIndex,
+  createPlaceDealsTable,
   createPlacesFreshnessIndex,
   createPlacesStatusIndex,
   createPlacesTable,
   seedConfirmedDeals,
+  seedPlaceDeals,
+  seedVerifiedPlaces,
 } from "../db/schema";
 
 interface Env {
@@ -33,19 +37,63 @@ interface ScheduledController {
 }
 
 async function ensureContentSchema(db: D1Database): Promise<void> {
+  await db.prepare(createPlacesTable).run();
+  const placeColumns = await db.prepare("PRAGMA table_info(baroke_places)").all();
+  if (!placeColumns.results.some((column) => column.name === "price_label")) {
+    const createNextPlacesTable = createPlacesTable.replace("baroke_places", "baroke_places_next");
+    await db.batch([
+      db.prepare("DROP INDEX IF EXISTS idx_baroke_places_status_created"),
+      db.prepare("DROP INDEX IF EXISTS idx_baroke_places_verified_checked"),
+      db.prepare(createNextPlacesTable),
+      db.prepare(`
+        INSERT INTO baroke_places_next (
+          id, name, meal_name, cuisine, price_min_cents, price_max_cents,
+          price_label, address, location_note, student_discount, source_url,
+          verification_status, last_checked_at, check_after, created_at
+        )
+        SELECT
+          id, name, meal_name, cuisine, price_min_cents, price_max_cents,
+          CASE
+            WHEN price_min_cents = price_max_cents THEN printf('$%.2f', price_min_cents / 100.0)
+            ELSE printf('$%.2f–$%.2f', price_min_cents / 100.0, price_max_cents / 100.0)
+          END,
+          address, location_note, student_discount, source_url,
+          verification_status, last_checked_at,
+          CASE WHEN last_checked_at IS NULL THEN NULL ELSE date(last_checked_at, '+30 days') END,
+          created_at
+        FROM baroke_places
+      `),
+      db.prepare("DROP TABLE baroke_places"),
+      db.prepare("ALTER TABLE baroke_places_next RENAME TO baroke_places"),
+    ]);
+  }
   const seedStatements = seedConfirmedDeals.map((deal) => db.prepare(`
     INSERT OR IGNORE INTO baroke_deals (
       id, brand, title, details, requirement, source_url,
       verified_at, expires_at, check_after, status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
   `).bind(...deal));
+  const placeStatements = seedVerifiedPlaces.map((place) => db.prepare(`
+    INSERT OR IGNORE INTO baroke_places (
+      id, name, meal_name, cuisine, price_min_cents, price_max_cents,
+      price_label, address, location_note, student_discount, source_url,
+      verification_status, last_checked_at, check_after, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?, ?, ?)
+  `).bind(...place));
+  const linkStatements = seedPlaceDeals.map((link) => db.prepare(`
+    INSERT OR IGNORE INTO baroke_place_deals (place_id, deal_id)
+    VALUES (?, ?)
+  `).bind(...link));
   await db.batch([
-    db.prepare(createPlacesTable),
     db.prepare(createPlacesStatusIndex),
     db.prepare(createPlacesFreshnessIndex),
     db.prepare(createDealsTable),
     db.prepare(createDealsStatusIndex),
+    db.prepare(createPlaceDealsTable),
+    db.prepare(createPlaceDealsLookupIndex),
     ...seedStatements,
+    ...placeStatements,
+    ...linkStatements,
   ]);
 }
 
@@ -54,7 +102,8 @@ async function sweepStalePlaces(db: D1Database): Promise<number> {
     UPDATE baroke_places
     SET verification_status = 'needs_review'
     WHERE verification_status = 'verified'
-      AND (last_checked_at IS NULL OR last_checked_at < datetime('now', '-1 day'))
+      AND check_after IS NOT NULL
+      AND check_after < date('now')
   `).run();
   return result.meta.changes ?? 0;
 }
@@ -66,17 +115,39 @@ function json(payload: unknown, status = 200): Response {
 async function listPlaces(env: Env): Promise<Response> {
   await ensureContentSchema(env.DB);
   await sweepStalePlaces(env.DB);
-  const result = await env.DB.prepare(`
-    SELECT id, name, meal_name, cuisine, price_min_cents, price_max_cents,
+  await sweepStaleDeals(env.DB);
+  const [placeResult, dealResult] = await env.DB.batch([
+    env.DB.prepare(`
+    SELECT id, name, meal_name, cuisine, price_min_cents, price_max_cents, price_label,
            address, location_note, student_discount, source_url,
-           verification_status, last_checked_at
+           verification_status, last_checked_at, check_after
     FROM baroke_places
     WHERE verification_status = 'verified'
-    ORDER BY price_min_cents, name
-  `).all();
+    ORDER BY price_min_cents IS NULL, price_min_cents, name
+  `),
+    env.DB.prepare(`
+      SELECT pd.place_id, d.id, d.brand, d.title, d.details, d.requirement,
+             d.source_url, d.verified_at, d.expires_at, d.check_after
+      FROM baroke_place_deals pd
+      JOIN baroke_deals d ON d.id = pd.deal_id
+      JOIN baroke_places p ON p.id = pd.place_id
+      WHERE p.verification_status = 'verified' AND d.status = 'confirmed'
+      ORDER BY pd.place_id, d.title
+    `),
+  ]);
+  const dealsByPlace = new Map<string, unknown[]>();
+  for (const row of dealResult.results) {
+    const placeId = String(row.place_id);
+    const existing = dealsByPlace.get(placeId) ?? [];
+    existing.push(row);
+    dealsByPlace.set(placeId, existing);
+  }
   return json({
-    places: result.results,
-    verification_policy: "Published places require evidence review. Records return to needs_review after 24 hours without a fresh check.",
+    places: placeResult.results.map((place) => ({
+      ...place,
+      deals: dealsByPlace.get(String(place.id)) ?? [],
+    })),
+    verification_policy: "Published places require evidence review. Each place and deal disappears after its recorded recheck or expiration boundary.",
   });
 }
 
@@ -105,9 +176,9 @@ async function submitPlace(request: Request, env: Env): Promise<Response> {
   await env.DB.prepare(`
     INSERT INTO baroke_places (
       id, name, meal_name, cuisine, price_min_cents, price_max_cents,
-      address, location_note, student_discount, source_url,
-      verification_status, last_checked_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?)
+      price_label, address, location_note, student_discount, source_url,
+      verification_status, last_checked_at, check_after, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, ?)
   `).bind(
     id,
     name,
@@ -115,6 +186,7 @@ async function submitPlace(request: Request, env: Env): Promise<Response> {
     cuisine,
     Math.round(mealPrice * 100),
     Math.round(mealPrice * 100),
+    `$${mealPrice.toFixed(2)}`,
     address,
     locationNote,
     input.student_discount === true ? 1 : 0,

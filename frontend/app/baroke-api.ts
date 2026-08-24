@@ -3,14 +3,17 @@ export type BarokePlace = {
   name: string;
   mealName: string;
   cuisine: string;
-  priceMin: number;
-  priceMax: number;
+  priceMin: number | null;
+  priceMax: number | null;
+  priceLabel: string;
   address: string;
   locationNote: string;
   studentDiscount: boolean;
   sourceUrl: string | null;
   verificationStatus: "verified" | "needs_review" | "pending" | "rejected";
   lastCheckedAt: string | null;
+  checkAfter: string | null;
+  deals: BarokeDeal[];
 };
 
 type PlaceRow = {
@@ -18,14 +21,17 @@ type PlaceRow = {
   name: string;
   meal_name: string;
   cuisine: string;
-  price_min_cents: number;
-  price_max_cents: number;
+  price_min_cents: number | null;
+  price_max_cents: number | null;
+  price_label: string;
   address: string;
   location_note: string;
   student_discount: number;
   source_url: string | null;
   verification_status: BarokePlace["verificationStatus"];
   last_checked_at: string | null;
+  check_after: string | null;
+  deals: DealRow[];
 };
 
 export type PlaceSubmission = {
@@ -75,14 +81,27 @@ export async function loadBarokePlaces(signal: AbortSignal): Promise<BarokePlace
     name: place.name,
     mealName: place.meal_name,
     cuisine: place.cuisine,
-    priceMin: place.price_min_cents / 100,
-    priceMax: place.price_max_cents / 100,
+    priceMin: place.price_min_cents === null ? null : place.price_min_cents / 100,
+    priceMax: place.price_max_cents === null ? null : place.price_max_cents / 100,
+    priceLabel: place.price_label,
     address: place.address,
     locationNote: place.location_note,
     studentDiscount: place.student_discount === 1,
     sourceUrl: place.source_url,
     verificationStatus: place.verification_status,
     lastCheckedAt: place.last_checked_at,
+    checkAfter: place.check_after,
+    deals: place.deals.map((deal) => ({
+      id: deal.id,
+      brand: deal.brand,
+      title: deal.title,
+      details: deal.details,
+      requirement: deal.requirement,
+      sourceUrl: deal.source_url,
+      verifiedAt: deal.verified_at,
+      expiresAt: deal.expires_at,
+      checkAfter: deal.check_after,
+    })),
   }));
 }
 
