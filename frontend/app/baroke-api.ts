@@ -32,12 +32,35 @@ export type PlaceSubmission = {
   name: string;
   meal_name: string;
   cuisine: string;
-  price_min: number;
-  price_max: number;
+  meal_price: number;
   address: string;
   location_note: string;
   student_discount: boolean;
   source_url: string;
+};
+
+export type BarokeDeal = {
+  id: string;
+  brand: string;
+  title: string;
+  details: string;
+  requirement: string;
+  sourceUrl: string;
+  verifiedAt: string;
+  expiresAt: string | null;
+  checkAfter: string;
+};
+
+type DealRow = {
+  id: string;
+  brand: string;
+  title: string;
+  details: string;
+  requirement: string;
+  source_url: string;
+  verified_at: string;
+  expires_at: string | null;
+  check_after: string;
 };
 
 export async function loadBarokePlaces(signal: AbortSignal): Promise<BarokePlace[]> {
@@ -73,4 +96,24 @@ export async function submitBarokePlace(submission: PlaceSubmission): Promise<vo
     const payload = await response.json().catch(() => ({ error: "Place could not be saved." })) as { error?: string };
     throw new Error(payload.error ?? "Place could not be saved.");
   }
+}
+
+export async function loadBarokeDeals(signal: AbortSignal): Promise<BarokeDeal[]> {
+  const response = await fetch("/api/deals", {
+    signal,
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("Baroke deal database unavailable");
+  const payload = await response.json() as { deals: DealRow[] };
+  return payload.deals.map((deal) => ({
+    id: deal.id,
+    brand: deal.brand,
+    title: deal.title,
+    details: deal.details,
+    requirement: deal.requirement,
+    sourceUrl: deal.source_url,
+    verifiedAt: deal.verified_at,
+    expiresAt: deal.expires_at,
+    checkAfter: deal.check_after,
+  }));
 }
