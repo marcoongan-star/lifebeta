@@ -22,18 +22,27 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the Baroke student food launch story", async () => {
+test("server-renders the simplified Baroke place experience", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Baroke — Baruch Student Eats, powered by LifeBeta<\/title>/i);
+  assert.match(html, /<title>Baroke — Verified Meal Prices<\/title>/i);
   assert.match(html, /The city got expensive/);
   assert.match(html, /\+37\.3%/);
-  assert.match(html, /Seeded demonstration listings/i);
-  assert.match(html, /They are not active offers or usable codes/i);
-  assert.match(html, /nothing is uploaded/i);
+  assert.match(html, /MEAL PRICE THEN/i);
+  assert.match(html, /MEALS LOST \/ WEEK/i);
+  assert.match(html, /Only manually verified places/i);
+  assert.match(html, /Add a place/i);
+  assert.match(html, /Submission is not publication/i);
+  assert.doesNotMatch(html, /BARUCH STUDENT EATS/i);
+  assert.doesNotMatch(html, /INTERACTIVE PRODUCT PREVIEW/i);
+  assert.doesNotMatch(html, /A code is only useful/i);
+  assert.doesNotMatch(html, /COMMUNITY SIGNAL/i);
+  assert.doesNotMatch(html, /Same calculation as/i);
+  assert.doesNotMatch(html, /OFFICIAL BENCHMARK/i);
+  assert.doesNotMatch(html, /LIFEBETA MEASURES THE PROBLEM/i);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
 });
 
