@@ -2,9 +2,9 @@
 
 A provenance-aware inflation evidence layer and a verified student-food database.
 
-LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into a place database: students can search reviewed meal prices, submit a place, and open current deal sources.
+LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into a place database: students can search reviewed meal prices, open a restaurant to inspect its current deals, or submit a place.
 
-Baroke never publishes a submission immediately. Records begin as pending, become public only after evidence review during a Baroke work session, and return to review when their price check is older than 24 hours. Automation can hide stale data; it cannot declare a place or deal true.
+Baroke never publishes a submission immediately. Records begin as pending, become public only after evidence review during a Baroke work session, and return to review after their recorded recheck date. Automation can hide stale data; it cannot declare a place or deal true.
 
 ## Marco's seeded basket
 
@@ -40,8 +40,10 @@ Seeded values are examples, not claims of current prices. Real observations will
 - A public Baroke landing page with fixed food-affordability metrics and a BLS source link.
 - A typed D1-backed Baroke place API with pending submissions, verified-only search results, and read-time freshness enforcement.
 - A student submission form that requires only place, cuisine, one meal price, and address; meal details, location notes, discount status, and evidence URL remain optional.
-- A D1-backed deals API with seven offers checked against first-party sources on August 24, 2026.
+- A D1-backed deals API with ten source-checked offers; chain promotions use first-party pages and community-reported specials receive shorter recheck dates.
 - Explicit expiration and recheck dates that remove stale deals from the public response without auto-verifying replacements.
+- A relational place-to-deal directory with six starter restaurants, including nearby chain locations and independently sourced NYC bargains.
+- Expandable restaurant cards with a checked-current-deal badge, exact terms, validity boundary, and evidence link.
 
 Seeded values are examples, never claims of live prices.
 
@@ -98,13 +100,13 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `frontend/app/baroque-explorer.tsx` | Verified place search and persistent submission form |
 | `frontend/app/baroke-api.ts` | Typed browser adapter for the place and deal APIs |
 | `frontend/worker/index.ts` | D1 routes, validation, and place/deal freshness sweeps |
-| `frontend/db/schema.ts` | Baroke place/deal tables, indexes, and confirmed deal seed records |
+| `frontend/db/schema.ts` | Baroke place/deal tables, many-to-many links, indexes, and reviewed seed records |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 11](docs/milestone-11.md) explains the current deal and submission flow; the earlier numbered documents explain how the project reached it.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the current restaurant-to-deal directory; the earlier numbered documents explain how the project reached it.
 
 ## Next milestones
 
