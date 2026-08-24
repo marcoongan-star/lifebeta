@@ -1,15 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
-const places = [
-  { id: "slice", name: "Lexington Slice", cuisine: "Pizza", price: 6.5, distance: .2, studentDiscount: true, x: 47, y: 42, note: "2 slices + drink" },
-  { id: "deli", name: "23rd Street Deli", cuisine: "Deli", price: 9.5, distance: .1, studentDiscount: true, x: 57, y: 57, note: "Egg sandwich + coffee" },
-  { id: "falafel", name: "Gramercy Falafel", cuisine: "Mediterranean", price: 9, distance: .4, studentDiscount: false, x: 35, y: 64, note: "Falafel pita" },
-  { id: "bento", name: "Madison Bento", cuisine: "Japanese", price: 12.5, distance: .3, studentDiscount: true, x: 44, y: 27, note: "Lunch bento" },
-  { id: "taco", name: "Taco Bell Cantina", cuisine: "Fast food", price: 8.5, distance: .8, studentDiscount: false, x: 72, y: 29, note: "Value-menu meal" },
-  { id: "curry", name: "Curry Hill Express", cuisine: "Indian", price: 11, distance: .9, studentDiscount: false, x: 76, y: 70, note: "Rice + curry special" },
-];
+import { useEffect, useMemo, useState } from "react";
+import { loadBarokePlaces, seededPlaces, type BarokePlace } from "./baroke-api";
 
 const dealPreviews = [
   { place: "Chipotle", title: "Rewards and app-promotion watch", source: "Chain offer monitor", status: "Needs source", tone: "verify" },
@@ -18,17 +10,33 @@ const dealPreviews = [
 ];
 
 export function BarokeExplorer() {
+  const [places, setPlaces] = useState<BarokePlace[]>(seededPlaces);
+  const [source, setSource] = useState<"api" | "seeded">("seeded");
   const [maxPrice, setMaxPrice] = useState(12);
   const [maxDistance, setMaxDistance] = useState(1);
   const [discountOnly, setDiscountOnly] = useState(false);
   const [selected, setSelected] = useState("slice");
   const [submission, setSubmission] = useState(false);
-  const filtered = useMemo(() => places.filter((place) => place.price <= maxPrice && place.distance <= maxDistance && (!discountOnly || place.studentDiscount)), [discountOnly, maxDistance, maxPrice]);
+  const filtered = useMemo(() => places.filter((place) => place.price <= maxPrice && place.distance <= maxDistance && (!discountOnly || place.studentDiscount)), [discountOnly, maxDistance, maxPrice, places]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadBarokePlaces(controller.signal)
+      .then((next) => {
+        setPlaces(next);
+        setSource(process.env.NEXT_PUBLIC_BAROKE_API_URL ? "api" : "seeded");
+      })
+      .catch(() => {
+        setPlaces(seededPlaces);
+        setSource("seeded");
+      });
+    return () => controller.abort();
+  }, []);
 
   return (
     <>
       <section className="explore-section" id="preview">
-        <div className="baroque-section-head"><div><span>INTERACTIVE PRODUCT PREVIEW</span><h2>Find lunch between classes.</h2></div><p>Seeded demonstration listings—not current restaurant prices.</p></div>
+        <div className="baroque-section-head"><div><span>INTERACTIVE PRODUCT PREVIEW</span><h2>Find lunch between classes.</h2></div><p>{source === "api" ? "API-backed demonstration records with explicit provenance." : "Seeded demonstration listings—not current restaurant prices."}</p></div>
         <div className="filter-bar">
           <fieldset><legend>TYPICAL MEAL PRICE</legend>{[8, 12, 16].map((price) => <button className={maxPrice === price ? "active" : ""} onClick={() => setMaxPrice(price)} key={price}>Up to ${price}</button>)}</fieldset>
           <label>DISTANCE FROM BARUCH<select value={maxDistance} onChange={(event) => setMaxDistance(Number(event.target.value))}><option value={.25}>¼ mile</option><option value={.5}>½ mile</option><option value={1}>1 mile</option></select></label>
