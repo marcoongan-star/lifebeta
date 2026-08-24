@@ -168,3 +168,30 @@ def test_food_affordability_endpoint_exposes_the_student_budget_tradeoff() -> No
     assert result["weekly_shortfall"] == "12.50"
     assert result["budget_covers_plan"] is False
     assert "no live restaurant price implied" in result["data_status"]
+
+
+def test_student_food_search_filters_and_labels_seeded_results() -> None:
+    response = client.get(
+        "/v1/student-food/places",
+        params={
+            "max_price": "10",
+            "max_distance": "0.5",
+            "student_discount_only": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [place["id"] for place in payload["places"]] == ["slice", "deli"]
+    assert all(place["student_discount"] for place in payload["places"])
+    assert all(place["provenance_status"] == "seeded_demo" for place in payload["places"])
+    assert "no current restaurant price" in payload["data_status"]
+
+
+def test_student_food_search_rejects_nonpositive_limits() -> None:
+    assert client.get(
+        "/v1/student-food/places", params={"max_price": "0"}
+    ).status_code == 422
+    assert client.get(
+        "/v1/student-food/places", params={"max_distance": "-1"}
+    ).status_code == 422

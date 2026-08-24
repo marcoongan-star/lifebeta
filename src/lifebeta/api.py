@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,7 @@ from .food_affordability import analyze_food_affordability
 from .store import LifeBetaStore, StoredBasket
 from .saved_analysis import analyze_saved_basket
 from .quality import assess_basket_quality
+from .student_food import StudentFoodPlace, search_student_food
 
 
 class ProductView(BaseModel):
@@ -292,6 +293,45 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/v1/student-food/places")
+    def student_food_places(
+        max_price: Decimal = Query(default=Decimal("12"), gt=0),
+        max_distance: Decimal = Query(default=Decimal("1"), gt=0),
+        student_discount_only: bool = False,
+    ) -> dict[str, object]:
+        matches = search_student_food(
+            max_price=max_price,
+            max_distance=max_distance,
+            student_discount_only=student_discount_only,
+        )
+
+        def place_json(place: StudentFoodPlace) -> dict[str, object]:
+            return {
+                "id": place.place_id,
+                "name": place.name,
+                "cuisine": place.cuisine,
+                "typical_meal_price": str(place.typical_meal_price),
+                "distance_miles": str(place.distance_miles),
+                "student_discount": place.student_discount,
+                "meal_note": place.meal_note,
+                "map_position": {"x": place.map_x, "y": place.map_y},
+                "provenance_status": place.provenance_status,
+            }
+
+        return {
+            "places": [place_json(place) for place in matches],
+            "result_count": len(matches),
+            "filters": {
+                "max_price": str(max_price),
+                "max_distance": str(max_distance),
+                "student_discount_only": student_discount_only,
+            },
+            "data_status": (
+                "Seeded Baroke demonstration records; no current restaurant price, "
+                "location, or active discount is implied."
+            ),
+        }
 
     @app.get("/v1/catalog", response_model=list[ProductView])
     def catalog() -> list[ProductView]:
