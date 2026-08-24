@@ -22,7 +22,8 @@ export function BarokeExplorer() {
   const [deals, setDeals] = useState<BarokeDeal[]>([]);
   const [maxPrice, setMaxPrice] = useState(12);
   const [location, setLocation] = useState("");
-  const [discountOnly, setDiscountOnly] = useState(false);
+  const [dealOnly, setDealOnly] = useState(false);
+  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(null);
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
   const [dealState, setDealState] = useState<DatabaseState>("loading");
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
@@ -32,9 +33,10 @@ export function BarokeExplorer() {
     const query = location.trim().toLowerCase();
     return places.filter((place) => {
       const locationMatches = !query || `${place.address} ${place.locationNote}`.toLowerCase().includes(query);
-      return place.priceMin <= maxPrice && locationMatches && (!discountOnly || place.studentDiscount);
+      const priceMatches = place.priceMin === null ? place.deals.length > 0 : place.priceMin <= maxPrice;
+      return priceMatches && locationMatches && (!dealOnly || place.deals.length > 0);
     });
-  }, [discountOnly, location, maxPrice, places]);
+  }, [dealOnly, location, maxPrice, places]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,12 +85,12 @@ export function BarokeExplorer() {
     <>
       <section className="explore-section" id="places">
         <div className="baroque-section-head">
-          <div><h2>Find lunch between classes.</h2></div>
+          <div><h2>Find lunch between classes.</h2></div><p>Choose a place to see its checked offers, exact terms, and source.</p>
         </div>
         <div className="filter-bar">
           <fieldset><legend>MEAL PRICE</legend>{[8, 12, 16].map((price) => <button type="button" className={maxPrice === price ? "active" : ""} onClick={() => setMaxPrice(price)} key={price}>Up to ${price}</button>)}</fieldset>
           <label>LOCATION<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Street or neighborhood" /></label>
-          <label className="discount-toggle"><input type="checkbox" checked={discountOnly} onChange={(event) => setDiscountOnly(event.target.checked)} /><span />Student discount only</label>
+          <label className="discount-toggle"><input type="checkbox" checked={dealOnly} onChange={(event) => setDealOnly(event.target.checked)} /><span />Current deal only</label>
           <div className="result-count"><strong>{filtered.length}</strong><span>verified places</span></div>
         </div>
 
@@ -97,21 +99,41 @@ export function BarokeExplorer() {
             {databaseState === "loading" && <div className="no-matches"><strong>Loading verified places…</strong></div>}
             {databaseState === "unavailable" && <div className="no-matches"><strong>Place database is temporarily unavailable.</strong><p>You can still add a place below and try again shortly.</p></div>}
             {databaseState === "ready" && filtered.length === 0 && <div className="no-matches"><strong>No verified matches yet.</strong><p>Add a place below. New submissions stay private until they pass review.</p></div>}
-            {databaseState === "ready" && filtered.map((place) => (
-              <article className="verified-place" key={place.id}>
-                <span className="place-price">{place.priceMin === place.priceMax ? `$${place.priceMin.toFixed(0)}` : `$${place.priceMin.toFixed(0)}–$${place.priceMax.toFixed(0)}`}<small>meal price</small></span>
-                <div><small>{place.cuisine} · {place.address}</small><strong>{place.name}</strong><p>{[place.mealName, place.locationNote].filter(Boolean).join(" · ")}</p></div>
-                <div className="place-badges">{place.studentDiscount && <i>STUDENT DISCOUNT</i>}<i>VERIFIED</i></div>
-              </article>
-            ))}
+            {databaseState === "ready" && filtered.map((place) => {
+              const expanded = expandedPlaceId === place.id;
+              return (
+                <article className={`verified-place${expanded ? " expanded" : ""}`} key={place.id}>
+                  <button className="place-summary" type="button" aria-expanded={expanded} onClick={() => setExpandedPlaceId(expanded ? null : place.id)}>
+                    <span className="place-price">{place.priceLabel}<small>{place.priceMin === null ? "current offer" : "meal price"}</small></span>
+                    <span className="place-copy"><small>{place.cuisine} · {place.address}</small><strong>{place.name}</strong><span>{[place.mealName, place.locationNote].filter(Boolean).join(" · ")}</span></span>
+                    <span className="place-badges">{place.deals.length > 0 && <i className="current-deal">✓ CURRENT DEAL</i>}{place.studentDiscount && <i>STUDENT DISCOUNT</i>}<i>VERIFIED</i></span>
+                    <b className="place-expand" aria-hidden="true">{expanded ? "−" : "+"}</b>
+                  </button>
+                  {expanded && (
+                    <div className="place-deal-drawer">
+                      <div className="place-deal-head"><span>{place.deals.length} CURRENT {place.deals.length === 1 ? "OFFER" : "OFFERS"}</span>{place.sourceUrl && <a href={place.sourceUrl} target="_blank" rel="noreferrer">Place source ↗</a>}</div>
+                      {place.deals.length === 0 && <p>No linked deal is current. The place itself is still verified.</p>}
+                      {place.deals.map((deal) => (
+                        <article key={deal.id}>
+                          <div><i>✓</i><h3>{deal.title}</h3></div>
+                          <p>{deal.details}</p>
+                          <p className="place-deal-terms">{deal.requirement}</p>
+                          <footer><span>{deal.expiresAt ? `Ends ${formatDealDate(deal.expiresAt)}` : `Recheck by ${formatDealDate(deal.checkAfter)}`}</span><a href={deal.sourceUrl} target="_blank" rel="noreferrer">Deal source ↗</a></footer>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
           <aside className="verification-panel">
             <small>HOW VERIFICATION WORKS</small>
             <ol>
               <li><span>1</span><p>A student adds the place, cuisine, meal price, and address. Extra details are optional.</p></li>
               <li><span>2</span><p>Codex checks the submitted source or receipt during a Baroke review session.</p></li>
-              <li><span>3</span><p>Only verified records become public search results.</p></li>
-              <li><span>4</span><p>Recheck dates hide stale records until Codex reviews them again.</p></li>
+              <li><span>3</span><p>A checked deal appears directly on its restaurant card.</p></li>
+              <li><span>4</span><p>Expired or overdue offers disappear until Codex verifies them again.</p></li>
             </ol>
           </aside>
         </div>
