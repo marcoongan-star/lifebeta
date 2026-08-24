@@ -1,10 +1,10 @@
 # LifeBeta + Baroke
 
-A provenance-aware inflation evidence layer and a student-food product preview.
+A provenance-aware inflation evidence layer and a verified student-food database.
 
-LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into an upcoming Baruch student product: cheap meal discovery, price and distance filters, student discounts, and deals with visible verification states.
+LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into a place database: students can search manually verified meal prices or submit a place for review.
 
-LifeBeta measures the problem. Baroke helps students act. The current Baroke restaurant listings, coordinates, and deal cards are seeded product demonstrations, not current prices or active offers.
+Baroke never publishes a submission immediately. Records begin as pending, become public only after manual evidence review, and return to review when their price check is older than 24 hours.
 
 ## Marco's seeded basket
 
@@ -37,8 +37,9 @@ Seeded values are examples, not claims of current prices. Real observations will
 - No-look-ahead basket quality reports for history depth, freshness, and source concentration.
 - A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
 - A tested meal-affordability model that translates price growth into meals lost, budget share, and weekly shortfall.
-- A public Baroke launch story with an interactive budget lab, seeded food-map filters, deal verification states, and a device-only submission preview.
-- A typed Baroke place-search API with price, distance, student-discount, and provenance fields plus a resilient seeded frontend fallback.
+- A public Baroke landing page with fixed food-affordability metrics and a BLS source link.
+- A typed D1-backed Baroke place API with pending submissions, verified-only search results, and a daily freshness policy.
+- A student submission form that persists meal, price range, address, location details, discount status, and evidence URL for manual review.
 
 Seeded values are examples, never claims of live prices.
 
@@ -91,9 +92,11 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `src/lifebeta/food_affordability.py` | Meals affordable, meals lost, and weekly budget shortfall |
 | `src/lifebeta/student_food.py` | Typed Baroke place records and deterministic search filters |
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
-| `frontend/app/student-eats-landing.tsx` | Baroke launch story and evidence-to-action product boundary |
-| `frontend/app/baroque-explorer.tsx` | Interactive budget, search, map, deals, and submission previews |
-| `frontend/app/baroke-api.ts` | Typed API adapter and explicitly seeded fallback records |
+| `frontend/app/student-eats-landing.tsx` | Baroke launch story and fixed affordability context |
+| `frontend/app/baroque-explorer.tsx` | Verified place search and persistent submission form |
+| `frontend/app/baroke-api.ts` | Typed browser adapter for the place API |
+| `frontend/worker/index.ts` | D1 place routes, validation, and stale-price sweep |
+| `frontend/db/schema.ts` | Baroke place table and lookup indexes |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
@@ -103,8 +106,8 @@ Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke
 
 ## Next milestones
 
-1. Build a small, manually verified Baruch-area place and meal dataset with provenance.
-2. Add geospatial search and return observation dates with every price.
-3. Add authenticated student submissions, moderation audit events, and automatic deal expiry.
+1. Add an authenticated moderator screen for approving or rejecting pending records.
+2. Add latitude/longitude and map-based search after addresses are geocoded.
+3. Add immutable moderation audit events and notifications when a price needs rechecking.
 
 This project is educational and does not provide personalized investment advice.

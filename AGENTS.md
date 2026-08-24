@@ -11,7 +11,8 @@ Marco owns the product, basket and privacy decisions. Codex implements, validate
 - Seeded observations must never be presented as current or live prices.
 - Unit normalization must occur before comparing packages, subscriptions or currencies.
 - Baroke is the student food discovery layer; LifeBeta remains its inflation-evidence layer.
-- Baroke place and deal previews remain explicitly seeded until every current claim has source and observation-date provenance.
+- Baroke contains no seeded public place claims. Student submissions start as pending and require manual verification before publication.
+- A verified Baroke price becomes `needs_review` after 24 hours without a fresh check; a sweep must never auto-verify a record.
 
 ## Working style
 
