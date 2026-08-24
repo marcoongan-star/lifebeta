@@ -13,6 +13,8 @@ Marco owns the product, basket and privacy decisions. Codex implements, validate
 - Baroke is the student food discovery layer; LifeBeta remains its inflation-evidence layer.
 - Baroke contains no seeded public place claims. Student submissions start as pending and require manual verification before publication.
 - A verified Baroke price becomes `needs_review` after 24 hours without a fresh check; a sweep must never auto-verify a record.
+- Codex verifies place and deal claims during explicit Baroke work sessions using first-party evidence. Background and read-time sweeps may only expire or flag records.
+- A public deal needs a first-party source, verification date, and either an expiration date or a future recheck date.
 
 ## Working style
 

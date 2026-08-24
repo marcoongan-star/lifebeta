@@ -4,15 +4,16 @@
 
 LifeBeta is the evidence layer. It explains how price changes affect a student's weekly food budget and preserves the provenance, units, effective dates, and quality state behind every calculation.
 
-Baroke is the action layer. It will help Baruch students find an affordable meal nearby, identify student discounts, and judge whether a deal is still trustworthy. The public landing page connects the two products without claiming that the current seeded restaurant cards are live data.
+Baroke is the action layer. It helps students find an affordable meal, identify student discounts, and inspect the first-party source behind a deal. The public landing page connects the two products without turning an unchecked submission into a public claim.
 
 ## Current request flow
 
-1. A visitor changes meal price, budget, or meal-count assumptions in the browser.
-2. The preview computes meals affordable and weekly shortfall locally so it remains usable without an account.
-3. The equivalent stateless backend calculation is available at `POST /v1/food-affordability` for future clients and automated testing.
-4. Search filters run against a small seeded list in the browser. Seeded coordinates, meal prices, and deal cards are demonstrations—not current claims.
-5. The submission form changes only local interface state. It explicitly says that no data is uploaded or saved.
+1. The landing page displays fixed affordability assumptions and links the underlying BLS release.
+2. `GET /api/places` runs a freshness check and returns only reviewed D1 records.
+3. A visitor can search those places by meal-price ceiling, address text, and student-discount status.
+4. `POST /api/places` requires place, cuisine, one meal price, and address, then saves a private `pending` record. Other details are optional.
+5. `GET /api/deals` returns source-checked offers whose expiration or recheck boundary has not passed.
+6. Codex performs truth checks during explicit work sessions; code only validates input, stores decisions, and demotes stale records.
 
 ## Production data flow
 
@@ -29,7 +30,7 @@ restaurant menus / permitted public sources / student submissions
        moderation: pending -> verified -> expired
                          |
                          v
-        PostgreSQL + geospatial search + cache
+        D1 now; PostgreSQL + geospatial search at scale
                          |
                          v
         FastAPI search/deal endpoints
@@ -50,7 +51,7 @@ The important architectural choice is that discovery and verification are separa
 | `deals` | terms, code, source URL, state, starts/ends, verified time | Prevents undated offers from silently staying live |
 | `submissions` | contributor, evidence, moderation state, audit events | Supports community input without direct publication |
 
-Deal states should be `pending`, `verified`, `expired`, or `rejected`. A background job can expire deals automatically, but only a moderator or trusted source should move a community submission to `verified`.
+The implemented deal states are `confirmed`, `needs_review`, and `expired`. A sweep can demote a deal automatically, but only a new review decision can move it back to `confirmed`.
 
 ## Search design
 
@@ -80,13 +81,13 @@ PostgreSQL can start with indexed latitude and longitude columns. If the dataset
 | Duplicate restaurant | Normalize address and coordinates before creating a place |
 | Fake submission | Keep it pending; require evidence, authentication, and moderation |
 | Map or geocoder unavailable | Preserve a sortable text list and distance information |
-| API unavailable | Keep the marketing evidence and seeded preview readable; never relabel cached data as live |
+| API unavailable | Keep the sourced affordability context readable; do not invent fallback places or deals |
 
 ## Free deployment path
 
 - React/TypeScript frontend on Sites (or Vercel if moved later).
 - FastAPI backend on a free Python host while traffic is small.
-- Managed PostgreSQL free tier for normalized places, prices, deals, and moderation records.
-- Scheduled verification tasks within free quotas.
+- D1 on the current free deployment for places, deals, and moderation state; PostgreSQL remains the scale-up path.
+- Read-time freshness checks, with scheduled demotion as an optional second layer.
 
-The next implementation milestone is not broad scraping. It is a small verified Baruch-area dataset, a real search endpoint, authenticated submissions, and a moderation queue.
+The next implementation milestone is not broad scraping. It is an authenticated moderation queue, duplicate detection, and a small reviewed place dataset with immutable audit events.

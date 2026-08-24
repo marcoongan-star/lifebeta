@@ -2,9 +2,9 @@
 
 A provenance-aware inflation evidence layer and a verified student-food database.
 
-LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into a place database: students can search manually verified meal prices or submit a place for review.
+LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into a place database: students can search reviewed meal prices, submit a place, and open current deal sources.
 
-Baroke never publishes a submission immediately. Records begin as pending, become public only after manual evidence review, and return to review when their price check is older than 24 hours.
+Baroke never publishes a submission immediately. Records begin as pending, become public only after evidence review during a Baroke work session, and return to review when their price check is older than 24 hours. Automation can hide stale data; it cannot declare a place or deal true.
 
 ## Marco's seeded basket
 
@@ -38,8 +38,10 @@ Seeded values are examples, not claims of current prices. Real observations will
 - A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
 - A tested meal-affordability model that translates price growth into meals lost, budget share, and weekly shortfall.
 - A public Baroke landing page with fixed food-affordability metrics and a BLS source link.
-- A typed D1-backed Baroke place API with pending submissions, verified-only search results, and a daily freshness policy.
-- A student submission form that persists meal, price range, address, location details, discount status, and evidence URL for manual review.
+- A typed D1-backed Baroke place API with pending submissions, verified-only search results, and read-time freshness enforcement.
+- A student submission form that requires only place, cuisine, one meal price, and address; meal details, location notes, discount status, and evidence URL remain optional.
+- A D1-backed deals API with seven offers checked against first-party sources on August 24, 2026.
+- Explicit expiration and recheck dates that remove stale deals from the public response without auto-verifying replacements.
 
 Seeded values are examples, never claims of live prices.
 
@@ -94,15 +96,15 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
 | `frontend/app/student-eats-landing.tsx` | Baroke launch story and fixed affordability context |
 | `frontend/app/baroque-explorer.tsx` | Verified place search and persistent submission form |
-| `frontend/app/baroke-api.ts` | Typed browser adapter for the place API |
-| `frontend/worker/index.ts` | D1 place routes, validation, and stale-price sweep |
-| `frontend/db/schema.ts` | Baroke place table and lookup indexes |
+| `frontend/app/baroke-api.ts` | Typed browser adapter for the place and deal APIs |
+| `frontend/worker/index.ts` | D1 routes, validation, and place/deal freshness sweeps |
+| `frontend/db/schema.ts` | Baroke place/deal tables, indexes, and confirmed deal seed records |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 9](docs/milestone-9.md) explains the first implemented Baroke search boundary; the earlier numbered documents explain the LifeBeta analytics in order.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 11](docs/milestone-11.md) explains the current deal and submission flow; the earlier numbered documents explain how the project reached it.
 
 ## Next milestones
 
