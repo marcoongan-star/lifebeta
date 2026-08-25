@@ -106,12 +106,12 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the current restaurant-to-deal directory; the earlier numbered documents explain how the project reached it.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the current restaurant-to-deal directory, and [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history; the earlier numbered documents explain how the project reached them.
 
 ## Next milestones
 
-1. Add an authenticated moderator screen for approving or rejecting pending records.
+1. Add an authenticated moderator screen for approving or rejecting pending records and append each decision to the audit trail.
 2. Add latitude/longitude and map-based search after addresses are geocoded.
-3. Add immutable moderation audit events and notifications when a price needs rechecking.
+3. Add reviewer notifications when a place or deal enters the queue.
 
 This project is educational and does not provide personalized investment advice.
