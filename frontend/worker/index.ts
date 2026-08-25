@@ -9,6 +9,11 @@ import {
   createPlacesFreshnessIndex,
   createPlacesStatusIndex,
   createPlacesTable,
+  createReviewEventsEntityIndex,
+  createReviewEventsImmutableDeleteTrigger,
+  createReviewEventsImmutableUpdateTrigger,
+  createReviewEventsQueueIndex,
+  createReviewEventsTable,
   seedConfirmedDeals,
   seedPlaceDeals,
   seedVerifiedPlaces,
@@ -17,6 +22,7 @@ import {
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  BAROKE_REVIEW_KEY?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -91,6 +97,11 @@ async function ensureContentSchema(db: D1Database): Promise<void> {
     db.prepare(createDealsStatusIndex),
     db.prepare(createPlaceDealsTable),
     db.prepare(createPlaceDealsLookupIndex),
+    db.prepare(createReviewEventsTable),
+    db.prepare(createReviewEventsEntityIndex),
+    db.prepare(createReviewEventsQueueIndex),
+    db.prepare(createReviewEventsImmutableUpdateTrigger),
+    db.prepare(createReviewEventsImmutableDeleteTrigger),
     ...seedStatements,
     ...placeStatements,
     ...linkStatements,
@@ -98,13 +109,29 @@ async function ensureContentSchema(db: D1Database): Promise<void> {
 }
 
 async function sweepStalePlaces(db: D1Database): Promise<number> {
-  const result = await db.prepare(`
-    UPDATE baroke_places
-    SET verification_status = 'needs_review'
-    WHERE verification_status = 'verified'
-      AND check_after IS NOT NULL
-      AND check_after < date('now')
-  `).run();
+  const [, result] = await db.batch([
+    db.prepare(`
+      INSERT OR IGNORE INTO baroke_review_events (
+        id, entity_type, entity_id, event_type, from_status, to_status,
+        reason, actor, occurred_at
+      )
+      SELECT
+        id || ':verification_overdue:' || date('now'), 'place', id,
+        'verification_overdue', 'verified', 'needs_review',
+        'The recorded evidence recheck date passed.', 'system-sweep', datetime('now')
+      FROM baroke_places
+      WHERE verification_status = 'verified'
+        AND check_after IS NOT NULL
+        AND check_after < date('now')
+    `),
+    db.prepare(`
+      UPDATE baroke_places
+      SET verification_status = 'needs_review'
+      WHERE verification_status = 'verified'
+        AND check_after IS NOT NULL
+        AND check_after < date('now')
+    `),
+  ]);
   return result.meta.changes ?? 0;
 }
 
@@ -173,31 +200,73 @@ async function submitPlace(request: Request, env: Env): Promise<Response> {
 
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
-  await env.DB.prepare(`
+  await env.DB.batch([
+    env.DB.prepare(`
     INSERT INTO baroke_places (
       id, name, meal_name, cuisine, price_min_cents, price_max_cents,
       price_label, address, location_note, student_discount, source_url,
       verification_status, last_checked_at, check_after, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, ?)
-  `).bind(
-    id,
-    name,
-    mealName || "Meal",
-    cuisine,
-    Math.round(mealPrice * 100),
-    Math.round(mealPrice * 100),
-    `$${mealPrice.toFixed(2)}`,
-    address,
-    locationNote,
-    input.student_discount === true ? 1 : 0,
-    sourceUrl,
-    createdAt,
-  ).run();
+    `).bind(
+      id,
+      name,
+      mealName || "Meal",
+      cuisine,
+      Math.round(mealPrice * 100),
+      Math.round(mealPrice * 100),
+      `$${mealPrice.toFixed(2)}`,
+      address,
+      locationNote,
+      input.student_discount === true ? 1 : 0,
+      sourceUrl,
+      createdAt,
+    ),
+    env.DB.prepare(`
+      INSERT INTO baroke_review_events (
+        id, entity_type, entity_id, event_type, from_status, to_status,
+        reason, actor, occurred_at
+      ) VALUES (?, 'place', ?, 'submitted', NULL, 'pending', ?, 'public-submission', ?)
+    `).bind(
+      crypto.randomUUID(),
+      id,
+      sourceUrl ? "Student submitted a place with an evidence link." : "Student submitted a place without an evidence link.",
+      createdAt,
+    ),
+  ]);
   return json({ id, verification_status: "pending", message: "Place saved for manual verification." }, 201);
 }
 
 async function sweepStaleDeals(db: D1Database): Promise<number> {
-  const [expired, stale] = await db.batch([
+  const [, , expired, stale] = await db.batch([
+    db.prepare(`
+      INSERT OR IGNORE INTO baroke_review_events (
+        id, entity_type, entity_id, event_type, from_status, to_status,
+        reason, actor, occurred_at
+      )
+      SELECT
+        id || ':deal_expired:' || date('now'), 'deal', id, 'deal_expired',
+        'confirmed', 'expired', 'The source stated expiration date passed.',
+        'system-sweep', datetime('now')
+      FROM baroke_deals
+      WHERE status = 'confirmed'
+        AND expires_at IS NOT NULL
+        AND expires_at < date('now')
+    `),
+    db.prepare(`
+      INSERT OR IGNORE INTO baroke_review_events (
+        id, entity_type, entity_id, event_type, from_status, to_status,
+        reason, actor, occurred_at
+      )
+      SELECT
+        id || ':deal_review_overdue:' || date('now'), 'deal', id,
+        'deal_review_overdue', 'confirmed', 'needs_review',
+        'The deal has no stated ending and its recheck date passed.',
+        'system-sweep', datetime('now')
+      FROM baroke_deals
+      WHERE status = 'confirmed'
+        AND expires_at IS NULL
+        AND check_after < date('now')
+    `),
     db.prepare(`
       UPDATE baroke_deals
       SET status = 'expired'
@@ -214,6 +283,47 @@ async function sweepStaleDeals(db: D1Database): Promise<number> {
     `),
   ]);
   return (expired.meta.changes ?? 0) + (stale.meta.changes ?? 0);
+}
+
+async function listReviewQueue(request: Request, env: Env): Promise<Response> {
+  if (!env.BAROKE_REVIEW_KEY) {
+    return json({ error: "Review access is not configured." }, 503);
+  }
+  if (request.headers.get("x-baroke-review-key") !== env.BAROKE_REVIEW_KEY) {
+    return json({ error: "Review access denied." }, 401);
+  }
+  await ensureContentSchema(env.DB);
+  await sweepStalePlaces(env.DB);
+  await sweepStaleDeals(env.DB);
+  const [places, deals, events] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, name, meal_name, cuisine, price_label, address, location_note,
+             source_url, verification_status, last_checked_at, check_after, created_at
+      FROM baroke_places
+      WHERE verification_status IN ('pending', 'needs_review')
+      ORDER BY CASE verification_status WHEN 'needs_review' THEN 0 ELSE 1 END,
+               created_at
+    `),
+    env.DB.prepare(`
+      SELECT id, brand, title, source_url, status, verified_at, expires_at, check_after
+      FROM baroke_deals
+      WHERE status IN ('needs_review', 'expired')
+      ORDER BY check_after, brand
+    `),
+    env.DB.prepare(`
+      SELECT id, entity_type, entity_id, event_type, from_status, to_status,
+             reason, actor, occurred_at
+      FROM baroke_review_events
+      ORDER BY occurred_at DESC, id DESC
+      LIMIT 100
+    `),
+  ]);
+  return json({
+    places: places.results,
+    deals: deals.results,
+    events: events.results,
+    rule: "Review records are append-only; public records remain hidden until a separate approval action is implemented.",
+  });
 }
 
 async function listDeals(env: Env): Promise<Response> {
@@ -247,6 +357,9 @@ const worker = {
     }
     if (url.pathname === "/api/deals" && request.method === "GET") {
       return listDeals(env);
+    }
+    if (url.pathname === "/api/internal/review-queue" && request.method === "GET") {
+      return listReviewQueue(request, env);
     }
 
     if (url.pathname === "/_vinext/image") {

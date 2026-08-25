@@ -69,6 +69,48 @@ export const createPlaceDealsLookupIndex = `
   ON baroke_place_deals (deal_id, place_id)
 `;
 
+export const createReviewEventsTable = `
+  CREATE TABLE IF NOT EXISTS baroke_review_events (
+    id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('place', 'deal')),
+    entity_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (
+      event_type IN ('submitted', 'verification_overdue', 'deal_expired', 'deal_review_overdue')
+    ),
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    occurred_at TEXT NOT NULL
+  )
+`;
+
+export const createReviewEventsEntityIndex = `
+  CREATE INDEX IF NOT EXISTS idx_baroke_review_events_entity_time
+  ON baroke_review_events (entity_type, entity_id, occurred_at DESC)
+`;
+
+export const createReviewEventsQueueIndex = `
+  CREATE INDEX IF NOT EXISTS idx_baroke_review_events_queue
+  ON baroke_review_events (to_status, occurred_at DESC)
+`;
+
+export const createReviewEventsImmutableUpdateTrigger = `
+  CREATE TRIGGER IF NOT EXISTS trg_baroke_review_events_no_update
+  BEFORE UPDATE ON baroke_review_events
+  BEGIN
+    SELECT RAISE(ABORT, 'review events are immutable');
+  END
+`;
+
+export const createReviewEventsImmutableDeleteTrigger = `
+  CREATE TRIGGER IF NOT EXISTS trg_baroke_review_events_no_delete
+  BEFORE DELETE ON baroke_review_events
+  BEGIN
+    SELECT RAISE(ABORT, 'review events are immutable');
+  END
+`;
+
 export const seedConfirmedDeals = [
   ["chipotle-summer-extras-2026", "Chipotle", "Summer of Extras", "Complete seven qualifying entrée purchases in one calendar month and choose a free entrée or 1,625 Rewards points.", "Chipotle Rewards membership and activation required. August progress ends August 31.", "https://www.chipotle.com/summer-of-extras-terms", "2026-08-24", "2026-08-31", "2026-08-31"],
   ["mcdonalds-fries-oct-2026", "McDonald’s", "Free medium fries with $1 purchase", "Use the McDonald’s app once per week through October 4, 2026.", "Participating locations; Rewards opt-in required; excludes delivery and tax.", "https://www.mcdonalds.com/us/en-us/deals.html", "2026-08-24", "2026-10-04", "2026-10-04"],
