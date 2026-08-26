@@ -10,6 +10,7 @@ function migratedDatabase() {
     "0002_baroke_deals.sql",
     "0003_place_deal_directory.sql",
     "0004_review_audit_queue.sql",
+    "0005_place_review_decisions.sql",
   ]) {
     database.exec(readFileSync(new URL(`../drizzle/${migration}`, import.meta.url), "utf8"));
   }
@@ -55,4 +56,109 @@ test("indexes entity history and review-state scans", () => {
 
   assert.ok(indexes.includes("idx_baroke_review_events_entity_time"));
   assert.ok(indexes.includes("idx_baroke_review_events_queue"));
+});
+
+test("records one idempotent verification decision beside the place update", () => {
+  const database = migratedDatabase();
+  database.prepare(`
+    INSERT INTO baroke_places (
+      id, name, meal_name, cuisine, price_min_cents, price_max_cents,
+      price_label, address, location_note, student_discount, source_url,
+      verification_status, last_checked_at, check_after, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 0, NULL, 'pending', NULL, NULL, ?)
+  `).run(
+    "pending-place",
+    "Test Kitchen",
+    "Lunch plate",
+    "Caribbean",
+    800,
+    800,
+    "$8.00",
+    "1 Test Street, New York, NY",
+    "2026-08-26T12:00:00Z",
+  );
+
+  const command = database.prepare(`
+    INSERT OR IGNORE INTO baroke_review_events (
+      id, entity_type, entity_id, event_type, from_status, to_status,
+      reason, actor, occurred_at
+    )
+    SELECT ?, 'place', id, 'place_verified', verification_status, 'verified', ?, ?, ?
+    FROM baroke_places
+    WHERE id = ? AND verification_status = 'pending'
+  `);
+  const commandArguments = [
+    "review-command:verify-pending-place",
+    "Menu and address checked against the linked source.",
+    "review-key",
+    "2026-08-26T13:00:00Z",
+    "pending-place",
+  ];
+  command.run(...commandArguments);
+  database.prepare(`
+    UPDATE baroke_places
+    SET verification_status = 'verified', source_url = ?,
+        last_checked_at = ?, check_after = ?
+    WHERE id = ? AND verification_status = 'pending'
+  `).run(
+    "https://example.com/menu",
+    "2026-08-26T13:00:00Z",
+    "2026-09-09",
+    "pending-place",
+  );
+  command.run(...commandArguments);
+
+  assert.deepEqual(
+    { ...database.prepare(`
+      SELECT verification_status, source_url, check_after
+      FROM baroke_places WHERE id = ?
+    `).get("pending-place") },
+    {
+      verification_status: "verified",
+      source_url: "https://example.com/menu",
+      check_after: "2026-09-09",
+    },
+  );
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS count FROM baroke_review_events WHERE id = ?")
+      .get("review-command:verify-pending-place").count,
+    1,
+  );
+});
+
+test("supports explicit rejection and re-verification event types", () => {
+  const database = migratedDatabase();
+  const insert = database.prepare(`
+    INSERT INTO baroke_review_events (
+      id, entity_type, entity_id, event_type, from_status, to_status,
+      reason, actor, occurred_at
+    ) VALUES (?, 'place', ?, ?, ?, ?, ?, 'review-key', ?)
+  `);
+  insert.run(
+    "event-reverified",
+    "place-1",
+    "place_reverified",
+    "needs_review",
+    "verified",
+    "Source was checked again.",
+    "2026-08-26T14:00:00Z",
+  );
+  insert.run(
+    "event-rejected",
+    "place-2",
+    "place_rejected",
+    "pending",
+    "rejected",
+    "Submission could not be substantiated.",
+    "2026-08-26T14:05:00Z",
+  );
+
+  assert.deepEqual(
+    database.prepare(`
+      SELECT event_type FROM baroke_review_events
+      WHERE id IN ('event-reverified', 'event-rejected')
+      ORDER BY id
+    `).all().map((row) => ({ ...row })),
+    [{ event_type: "place_rejected" }, { event_type: "place_reverified" }],
+  );
 });
