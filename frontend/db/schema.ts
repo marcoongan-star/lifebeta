@@ -75,7 +75,10 @@ export const createReviewEventsTable = `
     entity_type TEXT NOT NULL CHECK (entity_type IN ('place', 'deal')),
     entity_id TEXT NOT NULL,
     event_type TEXT NOT NULL CHECK (
-      event_type IN ('submitted', 'verification_overdue', 'deal_expired', 'deal_review_overdue')
+      event_type IN (
+        'submitted', 'verification_overdue', 'deal_expired', 'deal_review_overdue',
+        'place_verified', 'place_reverified', 'place_rejected'
+      )
     ),
     from_status TEXT,
     to_status TEXT NOT NULL,

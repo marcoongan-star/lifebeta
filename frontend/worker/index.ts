@@ -285,13 +285,20 @@ async function sweepStaleDeals(db: D1Database): Promise<number> {
   return (expired.meta.changes ?? 0) + (stale.meta.changes ?? 0);
 }
 
-async function listReviewQueue(request: Request, env: Env): Promise<Response> {
+function reviewActor(request: Request, env: Env): string | Response {
   if (!env.BAROKE_REVIEW_KEY) {
     return json({ error: "Review access is not configured." }, 503);
   }
   if (request.headers.get("x-baroke-review-key") !== env.BAROKE_REVIEW_KEY) {
     return json({ error: "Review access denied." }, 401);
   }
+  const authenticatedUserId = request.headers.get("oai-authenticated-user-id");
+  return authenticatedUserId ? `oai-user:${authenticatedUserId}` : "review-key";
+}
+
+async function listReviewQueue(request: Request, env: Env): Promise<Response> {
+  const actor = reviewActor(request, env);
+  if (actor instanceof Response) return actor;
   await ensureContentSchema(env.DB);
   await sweepStalePlaces(env.DB);
   await sweepStaleDeals(env.DB);
@@ -322,7 +329,101 @@ async function listReviewQueue(request: Request, env: Env): Promise<Response> {
     places: places.results,
     deals: deals.results,
     events: events.results,
-    rule: "Review records are append-only; public records remain hidden until a separate approval action is implemented.",
+    rule: "Review records are append-only. A protected decision must verify or reject each place before its public status changes.",
+  });
+}
+
+async function decidePlaceReview(
+  request: Request,
+  env: Env,
+  placeId: string,
+): Promise<Response> {
+  const actor = reviewActor(request, env);
+  if (actor instanceof Response) return actor;
+  await ensureContentSchema(env.DB);
+  const input = await request.json() as Record<string, unknown>;
+  const decision = String(input.decision ?? "").trim();
+  const reason = String(input.reason ?? "").trim();
+  const clientCommandId = String(input.client_command_id ?? "").trim();
+  if (!['verify', 'reject'].includes(decision) || reason.length < 8 || clientCommandId.length < 8) {
+    return json({ error: "Decision, a specific reason, and a command ID are required." }, 422);
+  }
+  const eventId = `review-command:${clientCommandId}`;
+  const previousCommand = await env.DB.prepare(`
+    SELECT entity_id, to_status FROM baroke_review_events WHERE id = ?
+  `).bind(eventId).first<Record<string, unknown>>();
+  const targetStatus = decision === "verify" ? "verified" : "rejected";
+  if (previousCommand) {
+    if (previousCommand.entity_id === placeId && previousCommand.to_status === targetStatus) {
+      return json({ id: placeId, status: targetStatus, decision, idempotent: true });
+    }
+    return json({ error: "That review command ID was already used for another decision." }, 409);
+  }
+  const place = await env.DB.prepare(`
+    SELECT id, source_url, verification_status FROM baroke_places WHERE id = ?
+  `).bind(placeId).first<Record<string, unknown>>();
+  if (!place) return json({ error: "Place not found." }, 404);
+  const previousStatus = String(place.verification_status);
+  if (!['pending', 'needs_review'].includes(previousStatus)) {
+    return json({ error: "Only queued places can receive a review decision." }, 409);
+  }
+
+  const occurredAt = new Date().toISOString();
+  const today = occurredAt.slice(0, 10);
+  const sourceUrl = String(input.source_url ?? place.source_url ?? "").trim();
+  const checkAfter = String(input.check_after ?? "").trim();
+  if (decision === "verify") {
+    if (!/^https?:\/\//i.test(sourceUrl)) {
+      return json({ error: "Verification requires an http:// or https:// evidence link." }, 422);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkAfter) || checkAfter <= today) {
+      return json({ error: "Verification requires a future YYYY-MM-DD recheck date." }, 422);
+    }
+  }
+  const eventType = decision === "reject"
+    ? "place_rejected"
+    : previousStatus === "needs_review" ? "place_reverified" : "place_verified";
+  const eventInsert = env.DB.prepare(`
+    INSERT OR IGNORE INTO baroke_review_events (
+      id, entity_type, entity_id, event_type, from_status, to_status,
+      reason, actor, occurred_at
+    )
+    SELECT ?, 'place', id, ?, verification_status, ?, ?, ?, ?
+    FROM baroke_places
+    WHERE id = ? AND verification_status = ?
+  `).bind(
+    eventId,
+    eventType,
+    targetStatus,
+    reason,
+    actor,
+    occurredAt,
+    placeId,
+    previousStatus,
+  );
+  const placeUpdate = decision === "verify"
+    ? env.DB.prepare(`
+        UPDATE baroke_places
+        SET verification_status = 'verified', source_url = ?,
+            last_checked_at = ?, check_after = ?
+        WHERE id = ? AND verification_status = ?
+      `).bind(sourceUrl, occurredAt, checkAfter, placeId, previousStatus)
+    : env.DB.prepare(`
+        UPDATE baroke_places
+        SET verification_status = 'rejected', check_after = NULL
+        WHERE id = ? AND verification_status = ?
+      `).bind(placeId, previousStatus);
+  const [, updated] = await env.DB.batch([eventInsert, placeUpdate]);
+  if ((updated.meta.changes ?? 0) !== 1) {
+    return json({ error: "The queue changed before this decision was applied. Reload and retry." }, 409);
+  }
+  return json({
+    id: placeId,
+    status: targetStatus,
+    decision,
+    last_checked_at: decision === "verify" ? occurredAt : null,
+    check_after: decision === "verify" ? checkAfter : null,
+    idempotent: false,
   });
 }
 
@@ -360,6 +461,10 @@ const worker = {
     }
     if (url.pathname === "/api/internal/review-queue" && request.method === "GET") {
       return listReviewQueue(request, env);
+    }
+    const placeReviewMatch = url.pathname.match(/^\/api\/internal\/review-queue\/places\/([^/]+)$/);
+    if (placeReviewMatch && request.method === "POST") {
+      return decidePlaceReview(request, env, decodeURIComponent(placeReviewMatch[1]));
     }
 
     if (url.pathname === "/_vinext/image") {
