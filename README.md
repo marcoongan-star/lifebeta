@@ -44,6 +44,8 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Explicit expiration and recheck dates that remove stale deals from the public response without auto-verifying replacements.
 - A relational place-to-deal directory with six starter restaurants, including nearby chain locations and independently sourced NYC bargains.
 - Expandable restaurant cards with a checked-current-deal badge, exact terms, validity boundary, and evidence link.
+- A private review queue with append-only place and deal history.
+- Protected, retry-safe place verification and rejection with reviewer attribution, evidence links, future recheck dates, and stale-write protection.
 
 Seeded values are examples, never claims of live prices.
 
@@ -106,12 +108,12 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the current restaurant-to-deal directory, and [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history; the earlier numbered documents explain how the project reached them.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, and [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication; the earlier numbered documents explain how the project reached them.
 
 ## Next milestones
 
-1. Add an authenticated moderator screen for approving or rejecting pending records and append each decision to the audit trail.
-2. Add latitude/longitude and map-based search after addresses are geocoded.
-3. Add reviewer notifications when a place or deal enters the queue.
+1. Add a private moderator screen on top of the protected place-decision API.
+2. Add protected deal verification and rejection with the same command and audit guarantees.
+3. Add latitude/longitude and map-based search after addresses are geocoded.
 
 This project is educational and does not provide personalized investment advice.
