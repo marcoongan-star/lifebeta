@@ -69,6 +69,89 @@ type DealRow = {
   check_after: string;
 };
 
+export type ReviewPlace = {
+  id: string;
+  name: string;
+  meal_name: string;
+  cuisine: string;
+  price_label: string;
+  address: string;
+  location_note: string;
+  source_url: string | null;
+  verification_status: "pending" | "needs_review";
+  last_checked_at: string | null;
+  check_after: string | null;
+  created_at: string;
+};
+
+export type ReviewDeal = {
+  id: string;
+  brand: string;
+  title: string;
+  source_url: string;
+  status: "needs_review" | "expired";
+  verified_at: string;
+  expires_at: string | null;
+  check_after: string;
+};
+
+export type ReviewEvent = {
+  id: string;
+  entity_type: "place" | "deal";
+  entity_id: string;
+  event_type: string;
+  from_status: string | null;
+  to_status: string;
+  reason: string;
+  actor: string;
+  occurred_at: string;
+};
+
+export type ReviewQueue = {
+  places: ReviewPlace[];
+  deals: ReviewDeal[];
+  events: ReviewEvent[];
+  rule: string;
+};
+
+async function reviewRequest<T>(path: string, reviewKey: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "x-baroke-review-key": reviewKey,
+      ...init.headers,
+    },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error ?? `Review request failed (${response.status}).`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export function loadReviewQueue(reviewKey: string, signal?: AbortSignal): Promise<ReviewQueue> {
+  return reviewRequest<ReviewQueue>("/api/internal/review-queue", reviewKey, { signal });
+}
+
+export function decidePlaceReview(
+  reviewKey: string,
+  placeId: string,
+  input: {
+    decision: "verify" | "reject";
+    reason: string;
+    source_url?: string;
+    check_after?: string;
+    client_command_id: string;
+  },
+): Promise<{ id: string; status: "verified" | "rejected"; idempotent: boolean }> {
+  return reviewRequest(`/api/internal/review-queue/places/${encodeURIComponent(placeId)}`, reviewKey, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function loadBarokePlaces(signal: AbortSignal): Promise<BarokePlace[]> {
   const response = await fetch("/api/places", {
     signal,
