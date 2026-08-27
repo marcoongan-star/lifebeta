@@ -72,3 +72,15 @@ test("states the data-quality and privacy rules", async () => {
   assert.match(html, /never raw Fidelity holdings/i);
   assert.match(html, /no fabricated live prices/i);
 });
+
+test("server-renders the locked Baroke evidence review workspace", async () => {
+  const response = await render("/review");
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /<title>Evidence Review — Baroke<\/title>/i);
+  assert.match(html, /PRIVATE OPERATIONS/i);
+  assert.match(html, /Enter the review credential/i);
+  assert.match(html, /not saved in browser storage/i);
+  assert.match(html, /name="robots" content="noindex, nofollow"/i);
+  assert.doesNotMatch(html, /Chipotle|Jin Mei|pending-place/i);
+});
