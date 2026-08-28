@@ -11,6 +11,7 @@ function migratedDatabase() {
     "0003_place_deal_directory.sql",
     "0004_review_audit_queue.sql",
     "0005_place_review_decisions.sql",
+    "0006_deal_review_decisions.sql",
   ]) {
     database.exec(readFileSync(new URL(`../drizzle/${migration}`, import.meta.url), "utf8"));
   }
@@ -26,6 +27,7 @@ test("applies the complete Baroke schema with seeded directory records", () => {
     8,
   );
   assert.equal(database.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
+  assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
 });
 
 test("keeps review history append-only", () => {
@@ -160,5 +162,51 @@ test("supports explicit rejection and re-verification event types", () => {
       ORDER BY id
     `).all().map((row) => ({ ...row })),
     [{ event_type: "place_rejected" }, { event_type: "place_reverified" }],
+  );
+});
+
+test("supports audited deal re-confirmation and rejection", () => {
+  const database = migratedDatabase();
+  const insert = database.prepare(`
+    INSERT INTO baroke_review_events (
+      id, entity_type, entity_id, event_type, from_status, to_status,
+      reason, actor, occurred_at
+    ) VALUES (?, 'deal', ?, ?, ?, ?, ?, 'review-key', ?)
+  `);
+  insert.run(
+    "deal-command-reconfirm",
+    "ten-ichi-half-price-2026",
+    "deal_reconfirmed",
+    "needs_review",
+    "confirmed",
+    "The offer page and next recheck were reviewed.",
+    "2026-08-28T14:00:00Z",
+  );
+  insert.run(
+    "deal-command-reject",
+    "que-rico-lunch-2026",
+    "deal_rejected",
+    "expired",
+    "rejected",
+    "The offer could no longer be substantiated.",
+    "2026-08-28T14:05:00Z",
+  );
+  database.prepare("UPDATE baroke_deals SET status = 'rejected' WHERE id = ?")
+    .run("que-rico-lunch-2026");
+
+  assert.equal(
+    database.prepare("SELECT status FROM baroke_deals WHERE id = ?")
+      .get("que-rico-lunch-2026").status,
+    "rejected",
+  );
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS count FROM baroke_deals WHERE status = 'confirmed'")
+      .get().count,
+    9,
+  );
+  assert.throws(
+    () => database.prepare("UPDATE baroke_review_events SET reason = 'changed' WHERE id = ?")
+      .run("deal-command-reconfirm"),
+    /review events are immutable/,
   );
 });

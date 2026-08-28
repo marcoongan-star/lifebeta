@@ -45,7 +45,7 @@ export const createDealsTable = `
     expires_at TEXT,
     check_after TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'confirmed'
-      CHECK (status IN ('confirmed', 'needs_review', 'expired'))
+      CHECK (status IN ('confirmed', 'needs_review', 'expired', 'rejected'))
   )
 `;
 
@@ -77,7 +77,8 @@ export const createReviewEventsTable = `
     event_type TEXT NOT NULL CHECK (
       event_type IN (
         'submitted', 'verification_overdue', 'deal_expired', 'deal_review_overdue',
-        'place_verified', 'place_reverified', 'place_rejected'
+        'place_verified', 'place_reverified', 'place_rejected',
+        'deal_confirmed', 'deal_reconfirmed', 'deal_rejected'
       )
     ),
     from_status TEXT,
