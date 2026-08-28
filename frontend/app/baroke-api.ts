@@ -152,6 +152,24 @@ export function decidePlaceReview(
   });
 }
 
+export function decideDealReview(
+  reviewKey: string,
+  dealId: string,
+  input: {
+    decision: "confirm" | "reject";
+    reason: string;
+    source_url?: string;
+    check_after?: string;
+    expires_at?: string;
+    client_command_id: string;
+  },
+): Promise<{ id: string; status: "confirmed" | "rejected"; idempotent: boolean }> {
+  return reviewRequest(`/api/internal/review-queue/deals/${encodeURIComponent(dealId)}`, reviewKey, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function loadBarokePlaces(signal: AbortSignal): Promise<BarokePlace[]> {
   const response = await fetch("/api/places", {
     signal,
