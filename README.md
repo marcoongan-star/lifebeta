@@ -46,6 +46,7 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Expandable restaurant cards with a checked-current-deal badge, exact terms, validity boundary, and evidence link.
 - A private review queue with append-only place and deal history.
 - Protected, retry-safe place verification and rejection with reviewer attribution, evidence links, future recheck dates, and stale-write protection.
+- Protected deal re-confirmation and rejection with validated evidence dates, stable command IDs, optimistic concurrency, and immutable audit events.
 - A locked `/review` operations workspace that keeps its credential in page memory and exposes no queue data before server authorization.
 
 Seeded values are examples, never claims of live prices.
@@ -109,12 +110,11 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, and [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface; the earlier numbered documents explain how the project reached them.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface, and [Milestone 16](docs/milestone-16.md) completes protected deal moderation; the earlier numbered documents explain how the project reached them.
 
 ## Next milestones
 
-1. Add protected deal verification and rejection with the same command and audit guarantees.
-2. Replace the shared review credential with individual production reviewer sessions.
-3. Add latitude/longitude and map-based search after addresses are geocoded.
+1. Replace the shared review credential with individual production reviewer sessions.
+2. Add latitude/longitude and map-based search after addresses are geocoded.
 
 This project is educational and does not provide personalized investment advice.
