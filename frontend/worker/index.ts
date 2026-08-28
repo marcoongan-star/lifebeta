@@ -427,6 +427,112 @@ async function decidePlaceReview(
   });
 }
 
+async function decideDealReview(
+  request: Request,
+  env: Env,
+  dealId: string,
+): Promise<Response> {
+  const actor = reviewActor(request, env);
+  if (actor instanceof Response) return actor;
+  await ensureContentSchema(env.DB);
+  const input = await request.json() as Record<string, unknown>;
+  const decision = String(input.decision ?? "").trim();
+  const reason = String(input.reason ?? "").trim();
+  const clientCommandId = String(input.client_command_id ?? "").trim();
+  if (!["confirm", "reject"].includes(decision) || reason.length < 8 || clientCommandId.length < 8) {
+    return json({ error: "Decision, a specific reason, and a command ID are required." }, 422);
+  }
+
+  const targetStatus = decision === "confirm" ? "confirmed" : "rejected";
+  const eventId = `review-command:${clientCommandId}`;
+  const previousCommand = await env.DB.prepare(`
+    SELECT entity_type, entity_id, to_status
+    FROM baroke_review_events WHERE id = ?
+  `).bind(eventId).first<Record<string, unknown>>();
+  if (previousCommand) {
+    if (
+      previousCommand.entity_type === "deal"
+      && previousCommand.entity_id === dealId
+      && previousCommand.to_status === targetStatus
+    ) {
+      return json({ id: dealId, status: targetStatus, decision, idempotent: true });
+    }
+    return json({ error: "That review command ID was already used for another decision." }, 409);
+  }
+
+  const deal = await env.DB.prepare(`
+    SELECT id, source_url, status, expires_at, check_after
+    FROM baroke_deals WHERE id = ?
+  `).bind(dealId).first<Record<string, unknown>>();
+  if (!deal) return json({ error: "Deal not found." }, 404);
+  const previousStatus = String(deal.status);
+  if (!["needs_review", "expired"].includes(previousStatus)) {
+    return json({ error: "Only queued deals can receive a review decision." }, 409);
+  }
+
+  const occurredAt = new Date().toISOString();
+  const today = occurredAt.slice(0, 10);
+  const sourceUrl = String(input.source_url ?? deal.source_url ?? "").trim();
+  const checkAfter = String(input.check_after ?? "").trim();
+  const expiresAt = String(input.expires_at ?? "").trim() || null;
+  if (decision === "confirm") {
+    if (!/^https?:\/\//i.test(sourceUrl)) {
+      return json({ error: "Confirmation requires an http:// or https:// evidence link." }, 422);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkAfter) || checkAfter <= today) {
+      return json({ error: "Confirmation requires a future YYYY-MM-DD recheck date." }, 422);
+    }
+    if (expiresAt && (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt) || expiresAt < today)) {
+      return json({ error: "An expiration date must be today or a future YYYY-MM-DD date." }, 422);
+    }
+  }
+
+  const eventType = decision === "confirm" ? "deal_reconfirmed" : "deal_rejected";
+  const eventInsert = env.DB.prepare(`
+    INSERT OR IGNORE INTO baroke_review_events (
+      id, entity_type, entity_id, event_type, from_status, to_status,
+      reason, actor, occurred_at
+    )
+    SELECT ?, 'deal', id, ?, status, ?, ?, ?, ?
+    FROM baroke_deals
+    WHERE id = ? AND status = ?
+  `).bind(
+    eventId,
+    eventType,
+    targetStatus,
+    reason,
+    actor,
+    occurredAt,
+    dealId,
+    previousStatus,
+  );
+  const dealUpdate = decision === "confirm"
+    ? env.DB.prepare(`
+        UPDATE baroke_deals
+        SET status = 'confirmed', source_url = ?, verified_at = ?,
+            expires_at = ?, check_after = ?
+        WHERE id = ? AND status = ?
+      `).bind(sourceUrl, today, expiresAt, checkAfter, dealId, previousStatus)
+    : env.DB.prepare(`
+        UPDATE baroke_deals
+        SET status = 'rejected'
+        WHERE id = ? AND status = ?
+      `).bind(dealId, previousStatus);
+  const [, updated] = await env.DB.batch([eventInsert, dealUpdate]);
+  if ((updated.meta.changes ?? 0) !== 1) {
+    return json({ error: "The queue changed before this decision was applied. Reload and retry." }, 409);
+  }
+  return json({
+    id: dealId,
+    status: targetStatus,
+    decision,
+    verified_at: decision === "confirm" ? today : null,
+    expires_at: decision === "confirm" ? expiresAt : null,
+    check_after: decision === "confirm" ? checkAfter : null,
+    idempotent: false,
+  });
+}
+
 async function listDeals(env: Env): Promise<Response> {
   await ensureContentSchema(env.DB);
   await sweepStaleDeals(env.DB);
@@ -465,6 +571,10 @@ const worker = {
     const placeReviewMatch = url.pathname.match(/^\/api\/internal\/review-queue\/places\/([^/]+)$/);
     if (placeReviewMatch && request.method === "POST") {
       return decidePlaceReview(request, env, decodeURIComponent(placeReviewMatch[1]));
+    }
+    const dealReviewMatch = url.pathname.match(/^\/api\/internal\/review-queue\/deals\/([^/]+)$/);
+    if (dealReviewMatch && request.method === "POST") {
+      return decideDealReview(request, env, decodeURIComponent(dealReviewMatch[1]));
     }
 
     if (url.pathname === "/_vinext/image") {
