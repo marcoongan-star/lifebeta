@@ -102,15 +102,15 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
 | `frontend/app/student-eats-landing.tsx` | Baroke launch story and fixed affordability context |
 | `frontend/app/baroque-explorer.tsx` | Verified place search and persistent submission form |
-| `frontend/app/baroke-api.ts` | Typed browser adapter for the place and deal APIs |
-| `frontend/worker/index.ts` | D1 routes, validation, and place/deal freshness sweeps |
+| `frontend/app/baroke-api.ts` | Typed browser adapter for public data and protected review operations |
+| `frontend/worker/index.ts` | D1 routes, validation, freshness sweeps, and entity-scoped audit history |
 | `frontend/db/schema.ts` | Baroke place/deal tables, many-to-many links, indexes, and reviewed seed records |
 | `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
 | `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface, and [Milestone 16](docs/milestone-16.md) completes protected deal moderation; the earlier numbered documents explain how the project reached them.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface, [Milestone 16](docs/milestone-16.md) completes protected deal moderation, and [Milestone 17](docs/milestone-17.md) adds protected per-deal evidence timelines; the earlier numbered documents explain how the project reached them.
 
 ## Next milestones
 
