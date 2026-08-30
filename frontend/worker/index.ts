@@ -333,6 +333,37 @@ async function listReviewQueue(request: Request, env: Env): Promise<Response> {
   });
 }
 
+async function listDealReviewHistory(
+  request: Request,
+  env: Env,
+  dealId: string,
+): Promise<Response> {
+  const actor = reviewActor(request, env);
+  if (actor instanceof Response) return actor;
+  await ensureContentSchema(env.DB);
+
+  const deal = await env.DB.prepare(`
+    SELECT id, brand, title, status, source_url, verified_at, expires_at, check_after
+    FROM baroke_deals
+    WHERE id = ?
+  `).bind(dealId).first<Record<string, unknown>>();
+  if (!deal) return json({ error: "Deal not found." }, 404);
+
+  const events = await env.DB.prepare(`
+    SELECT id, entity_type, entity_id, event_type, from_status, to_status,
+           reason, actor, occurred_at
+    FROM baroke_review_events
+    WHERE entity_type = 'deal' AND entity_id = ?
+    ORDER BY occurred_at DESC, id DESC
+  `).bind(dealId).all();
+
+  return json({
+    deal,
+    events: events.results,
+    rule: "This entity history is append-only and available only through the protected review route.",
+  });
+}
+
 async function decidePlaceReview(
   request: Request,
   env: Env,
@@ -573,6 +604,9 @@ const worker = {
       return decidePlaceReview(request, env, decodeURIComponent(placeReviewMatch[1]));
     }
     const dealReviewMatch = url.pathname.match(/^\/api\/internal\/review-queue\/deals\/([^/]+)$/);
+    if (dealReviewMatch && request.method === "GET") {
+      return listDealReviewHistory(request, env, decodeURIComponent(dealReviewMatch[1]));
+    }
     if (dealReviewMatch && request.method === "POST") {
       return decideDealReview(request, env, decodeURIComponent(dealReviewMatch[1]));
     }

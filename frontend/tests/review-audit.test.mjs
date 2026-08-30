@@ -60,6 +60,31 @@ test("indexes entity history and review-state scans", () => {
   assert.ok(indexes.includes("idx_baroke_review_events_queue"));
 });
 
+test("loads one deal history newest-first through the entity index", () => {
+  const database = migratedDatabase();
+  const insert = database.prepare(`
+    INSERT INTO baroke_review_events (
+      id, entity_type, entity_id, event_type, from_status, to_status,
+      reason, actor, occurred_at
+    ) VALUES (?, 'deal', ?, ?, ?, ?, ?, 'review-key', ?)
+  `);
+  insert.run("deal-a-old", "deal-a", "deal_review_overdue", "confirmed", "needs_review", "Recheck passed.", "2026-08-27T10:00:00Z");
+  insert.run("deal-a-new", "deal-a", "deal_reconfirmed", "needs_review", "confirmed", "Evidence renewed.", "2026-08-28T10:00:00Z");
+  insert.run("deal-b", "deal-b", "deal_rejected", "expired", "rejected", "Different deal.", "2026-08-29T10:00:00Z");
+
+  const query = `
+    SELECT id FROM baroke_review_events
+    WHERE entity_type = 'deal' AND entity_id = ?
+    ORDER BY occurred_at DESC, id DESC
+  `;
+  assert.deepEqual(
+    database.prepare(query).all("deal-a").map((row) => row.id),
+    ["deal-a-new", "deal-a-old"],
+  );
+  const plan = database.prepare(`EXPLAIN QUERY PLAN ${query}`).all("deal-a");
+  assert.ok(plan.some((row) => String(row.detail).includes("idx_baroke_review_events_entity_time")));
+});
+
 test("records one idempotent verification decision beside the place update", () => {
   const database = migratedDatabase();
   database.prepare(`

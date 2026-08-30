@@ -114,6 +114,21 @@ export type ReviewQueue = {
   rule: string;
 };
 
+export type DealReviewHistory = {
+  deal: {
+    id: string;
+    brand: string;
+    title: string;
+    status: "confirmed" | "needs_review" | "expired" | "rejected";
+    source_url: string;
+    verified_at: string;
+    expires_at: string | null;
+    check_after: string;
+  };
+  events: ReviewEvent[];
+  rule: string;
+};
+
 async function reviewRequest<T>(path: string, reviewKey: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -133,6 +148,18 @@ async function reviewRequest<T>(path: string, reviewKey: string, init: RequestIn
 
 export function loadReviewQueue(reviewKey: string, signal?: AbortSignal): Promise<ReviewQueue> {
   return reviewRequest<ReviewQueue>("/api/internal/review-queue", reviewKey, { signal });
+}
+
+export function loadDealReviewHistory(
+  reviewKey: string,
+  dealId: string,
+  signal?: AbortSignal,
+): Promise<DealReviewHistory> {
+  return reviewRequest<DealReviewHistory>(
+    `/api/internal/review-queue/deals/${encodeURIComponent(dealId)}`,
+    reviewKey,
+    { signal },
+  );
 }
 
 export function decidePlaceReview(
