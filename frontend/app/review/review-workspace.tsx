@@ -5,7 +5,9 @@ import Link from "next/link";
 import {
   decideDealReview,
   decidePlaceReview,
+  loadDealReviewHistory,
   loadReviewQueue,
+  type ReviewEvent,
   type ReviewDeal,
   type ReviewPlace,
   type ReviewQueue,
@@ -55,6 +57,8 @@ function DealDecision({ deal, reviewKey, onComplete }: { deal: ReviewDeal; revie
   const [pendingCommandId, setPendingCommandId] = useState("");
   const [busy, setBusy] = useState<"confirm" | "reject" | null>(null);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<ReviewEvent[] | null>(null);
+  const [historyState, setHistoryState] = useState<"closed" | "loading" | "ready" | "error">("closed");
 
   async function decide(decision: "confirm" | "reject") {
     const commandId = pendingCommandId || crypto.randomUUID();
@@ -78,7 +82,28 @@ function DealDecision({ deal, reviewKey, onComplete }: { deal: ReviewDeal; revie
     }
   }
 
-  return <article className="review-place-card review-deal-card"><header><span>{deal.status.replace("_", " ")}</span><small>Last verified {deal.verified_at}</small></header><h3>{deal.brand}</h3><p>{deal.title}</p><a className="review-evidence-link" href={deal.source_url} target="_blank" rel="noreferrer">Open existing evidence ↗</a><div className="review-fields"><label>EVIDENCE URL<input type="url" value={sourceUrl} placeholder="https://…" onChange={(event) => setSourceUrl(event.target.value)} /></label><label>NEXT RECHECK<input type="date" value={checkAfter} onChange={(event) => setCheckAfter(event.target.value)} /></label><label>OFFER ENDS · OPTIONAL<input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label><label className="review-reason">SPECIFIC DECISION REASON<textarea required minLength={8} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="What did the current evidence establish?" /></label></div><div className="review-actions"><button className="reject" disabled={busy !== null || reason.length < 8} onClick={() => void decide("reject")}>{busy === "reject" ? "Rejecting…" : "Reject deal"}</button><button className="verify" disabled={busy !== null || reason.length < 8 || !sourceUrl || !checkAfter} onClick={() => void decide("confirm")}>{busy === "confirm" ? "Saving…" : "Re-confirm deal →"}</button></div>{error && <p className="review-error" role="alert">{error} {pendingCommandId && "A retry will reuse the same command."}</p>}</article>;
+  async function toggleHistory() {
+    if (historyState === "ready") {
+      setHistoryState("closed");
+      return;
+    }
+    if (historyState === "closed" && history) {
+      setHistoryState("ready");
+      return;
+    }
+    setHistoryState("loading");
+    setError("");
+    try {
+      const result = await loadDealReviewHistory(reviewKey, deal.id);
+      setHistory(result.events);
+      setHistoryState("ready");
+    } catch (requestError) {
+      setHistoryState("error");
+      setError(requestError instanceof Error ? requestError.message : "The evidence history could not be loaded.");
+    }
+  }
+
+  return <article className="review-place-card review-deal-card"><header><span>{deal.status.replace("_", " ")}</span><small>Last verified {deal.verified_at}</small></header><h3>{deal.brand}</h3><p>{deal.title}</p><div className="review-evidence-actions"><a className="review-evidence-link" href={deal.source_url} target="_blank" rel="noreferrer">Open existing evidence ↗</a><button type="button" onClick={() => void toggleHistory()} disabled={historyState === "loading"}>{historyState === "loading" ? "Loading history…" : historyState === "ready" ? "Hide evidence history" : "View evidence history"}</button></div>{historyState === "ready" && <ol className="review-history">{history?.length ? history.map((event) => <li key={event.id}><div><strong>{event.event_type.replaceAll("_", " ")}</strong><time dateTime={event.occurred_at}>{new Date(event.occurred_at).toLocaleString()}</time></div><p>{event.reason}</p><small>{event.from_status ?? "created"} → {event.to_status} · {event.actor}</small></li>) : <li className="empty">No review decisions have been recorded for this deal yet.</li>}</ol>}<div className="review-fields"><label>EVIDENCE URL<input type="url" value={sourceUrl} placeholder="https://…" onChange={(event) => setSourceUrl(event.target.value)} /></label><label>NEXT RECHECK<input type="date" value={checkAfter} onChange={(event) => setCheckAfter(event.target.value)} /></label><label>OFFER ENDS · OPTIONAL<input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label><label className="review-reason">SPECIFIC DECISION REASON<textarea required minLength={8} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="What did the current evidence establish?" /></label></div><div className="review-actions"><button className="reject" disabled={busy !== null || reason.length < 8} onClick={() => void decide("reject")}>{busy === "reject" ? "Rejecting…" : "Reject deal"}</button><button className="verify" disabled={busy !== null || reason.length < 8 || !sourceUrl || !checkAfter} onClick={() => void decide("confirm")}>{busy === "confirm" ? "Saving…" : "Re-confirm deal →"}</button></div>{error && <p className="review-error" role="alert">{error} {pendingCommandId && "A retry will reuse the same command."}</p>}</article>;
 }
 
 function PlaceDecision({ place, reviewKey, onComplete }: { place: ReviewPlace; reviewKey: string; onComplete: () => void }) {
