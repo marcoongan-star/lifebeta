@@ -110,11 +110,11 @@ Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` fo
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface, [Milestone 16](docs/milestone-16.md) completes protected deal moderation, and [Milestone 17](docs/milestone-17.md) adds protected per-deal evidence timelines; the earlier numbered documents explain how the project reached them.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface, [Milestone 16](docs/milestone-16.md) completes protected deal moderation, [Milestone 17](docs/milestone-17.md) adds protected per-deal evidence timelines, and [Milestone 18](docs/milestone-18.md) introduces provenance-backed coordinates and campus-distance search; the earlier numbered documents explain how the project reached them.
 
 ## Next milestones
 
 1. Replace the shared review credential with individual production reviewer sessions.
-2. Add latitude/longitude and map-based search after addresses are geocoded.
+2. Replace straight-line distance with walking-route distance after selecting a permitted free routing provider.
 
 This project is educational and does not provide personalized investment advice.
