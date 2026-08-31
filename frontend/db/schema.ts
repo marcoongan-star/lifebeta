@@ -45,11 +45,11 @@ export const createDealsTable = `
     details TEXT NOT NULL,
     requirement TEXT NOT NULL,
     source_url TEXT NOT NULL,
-    verified_at TEXT NOT NULL,
+    verified_at TEXT,
     expires_at TEXT,
-    check_after TEXT NOT NULL,
+    check_after TEXT,
     status TEXT NOT NULL DEFAULT 'confirmed'
-      CHECK (status IN ('confirmed', 'needs_review', 'expired', 'rejected'))
+      CHECK (status IN ('pending', 'confirmed', 'needs_review', 'expired', 'rejected'))
   )
 `;
 

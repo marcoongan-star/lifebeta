@@ -253,6 +253,44 @@ async function submitPlace(request: Request, env: Env): Promise<Response> {
   return json({ id, verification_status: "pending", message: "Place saved for manual verification." }, 201);
 }
 
+async function submitDeal(request: Request, env: Env, placeId: string): Promise<Response> {
+  await ensureContentSchema(env.DB);
+  const input = await request.json() as Record<string, unknown>;
+  const title = String(input.title ?? "").trim();
+  const details = String(input.details ?? "").trim();
+  const requirement = String(input.requirement ?? "").trim();
+  const sourceUrl = String(input.source_url ?? "").trim();
+  if (title.length < 3 || details.length < 8 || !/^https?:\/\//i.test(sourceUrl)) {
+    return json({ error: "Deal title, specific details, and an http:// or https:// proof link are required." }, 422);
+  }
+  const place = await env.DB.prepare(`
+    SELECT id, name FROM baroke_places
+    WHERE id = ? AND verification_status = 'verified'
+  `).bind(placeId).first<{ id: string; name: string }>();
+  if (!place) return json({ error: "Choose a currently verified place." }, 404);
+
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO baroke_deals (
+        id, brand, title, details, requirement, source_url,
+        verified_at, expires_at, check_after, status
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'pending')
+    `).bind(id, place.name, title, details, requirement || "Confirm the terms at the location before ordering.", sourceUrl),
+    env.DB.prepare(`
+      INSERT INTO baroke_place_deals (place_id, deal_id) VALUES (?, ?)
+    `).bind(place.id, id),
+    env.DB.prepare(`
+      INSERT INTO baroke_review_events (
+        id, entity_type, entity_id, event_type, from_status, to_status,
+        reason, actor, occurred_at
+      ) VALUES (?, 'deal', ?, 'submitted', NULL, 'pending', ?, 'public-submission', ?)
+    `).bind(crypto.randomUUID(), id, "Student submitted a deal with a proof link for manual review.", createdAt),
+  ]);
+  return json({ id, status: "pending", message: "Deal saved for manual verification." }, 201);
+}
+
 async function sweepStaleDeals(db: D1Database): Promise<number> {
   const [, , expired, stale] = await db.batch([
     db.prepare(`
@@ -332,8 +370,9 @@ async function listReviewQueue(request: Request, env: Env): Promise<Response> {
     env.DB.prepare(`
       SELECT id, brand, title, source_url, status, verified_at, expires_at, check_after
       FROM baroke_deals
-      WHERE status IN ('needs_review', 'expired')
-      ORDER BY check_after, brand
+      WHERE status IN ('pending', 'needs_review', 'expired')
+      ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'needs_review' THEN 1 ELSE 2 END,
+               check_after, brand
     `),
     env.DB.prepare(`
       SELECT id, entity_type, entity_id, event_type, from_status, to_status,
@@ -533,7 +572,7 @@ async function decideDealReview(
   `).bind(dealId).first<Record<string, unknown>>();
   if (!deal) return json({ error: "Deal not found." }, 404);
   const previousStatus = String(deal.status);
-  if (!["needs_review", "expired"].includes(previousStatus)) {
+  if (!["pending", "needs_review", "expired"].includes(previousStatus)) {
     return json({ error: "Only queued deals can receive a review decision." }, 409);
   }
 
@@ -554,7 +593,9 @@ async function decideDealReview(
     }
   }
 
-  const eventType = decision === "confirm" ? "deal_reconfirmed" : "deal_rejected";
+  const eventType = decision === "confirm"
+    ? previousStatus === "pending" ? "deal_confirmed" : "deal_reconfirmed"
+    : "deal_rejected";
   const eventInsert = env.DB.prepare(`
     INSERT OR IGNORE INTO baroke_review_events (
       id, entity_type, entity_id, event_type, from_status, to_status,
@@ -628,6 +669,10 @@ const worker = {
     }
     if (url.pathname === "/api/places" && request.method === "POST") {
       return submitPlace(request, env);
+    }
+    const dealSubmissionMatch = url.pathname.match(/^\/api\/places\/([^/]+)\/deals$/);
+    if (dealSubmissionMatch && request.method === "POST") {
+      return submitDeal(request, env, decodeURIComponent(dealSubmissionMatch[1]));
     }
     if (url.pathname === "/api/deals" && request.method === "GET") {
       return listDeals(env);
