@@ -16,6 +16,7 @@ import {
   createReviewEventsTable,
   seedConfirmedDeals,
   seedPlaceDeals,
+  seedVerifiedCoordinates,
   seedVerifiedPlaces,
 } from "../db/schema";
 
@@ -44,7 +45,7 @@ interface ScheduledController {
 
 async function ensureContentSchema(db: D1Database): Promise<void> {
   await db.prepare(createPlacesTable).run();
-  const placeColumns = await db.prepare("PRAGMA table_info(baroke_places)").all();
+  let placeColumns = await db.prepare("PRAGMA table_info(baroke_places)").all();
   if (!placeColumns.results.some((column) => column.name === "price_label")) {
     const createNextPlacesTable = createPlacesTable.replace("baroke_places", "baroke_places_next");
     await db.batch([
@@ -72,6 +73,15 @@ async function ensureContentSchema(db: D1Database): Promise<void> {
       db.prepare("DROP TABLE baroke_places"),
       db.prepare("ALTER TABLE baroke_places_next RENAME TO baroke_places"),
     ]);
+    placeColumns = await db.prepare("PRAGMA table_info(baroke_places)").all();
+  }
+  if (!placeColumns.results.some((column) => column.name === "latitude")) {
+    await db.batch([
+      db.prepare("ALTER TABLE baroke_places ADD COLUMN latitude REAL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90)"),
+      db.prepare("ALTER TABLE baroke_places ADD COLUMN longitude REAL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180)"),
+      db.prepare("ALTER TABLE baroke_places ADD COLUMN coordinate_source_url TEXT"),
+      db.prepare("ALTER TABLE baroke_places ADD COLUMN coordinate_checked_at TEXT"),
+    ]);
   }
   const seedStatements = seedConfirmedDeals.map((deal) => db.prepare(`
     INSERT OR IGNORE INTO baroke_deals (
@@ -86,6 +96,11 @@ async function ensureContentSchema(db: D1Database): Promise<void> {
       verification_status, last_checked_at, check_after, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?, ?, ?)
   `).bind(...place));
+  const coordinateStatements = seedVerifiedCoordinates.map((coordinate) => db.prepare(`
+    UPDATE baroke_places
+    SET latitude = ?, longitude = ?, coordinate_source_url = ?, coordinate_checked_at = ?
+    WHERE id = ? AND latitude IS NULL AND longitude IS NULL
+  `).bind(coordinate[1], coordinate[2], coordinate[3], coordinate[4], coordinate[0]));
   const linkStatements = seedPlaceDeals.map((link) => db.prepare(`
     INSERT OR IGNORE INTO baroke_place_deals (place_id, deal_id)
     VALUES (?, ?)
@@ -104,6 +119,7 @@ async function ensureContentSchema(db: D1Database): Promise<void> {
     db.prepare(createReviewEventsImmutableDeleteTrigger),
     ...seedStatements,
     ...placeStatements,
+    ...coordinateStatements,
     ...linkStatements,
   ]);
 }
@@ -147,6 +163,7 @@ async function listPlaces(env: Env): Promise<Response> {
     env.DB.prepare(`
     SELECT id, name, meal_name, cuisine, price_min_cents, price_max_cents, price_label,
            address, location_note, student_discount, source_url,
+           latitude, longitude, coordinate_source_url, coordinate_checked_at,
            verification_status, last_checked_at, check_after
     FROM baroke_places
     WHERE verification_status = 'verified'
@@ -305,7 +322,8 @@ async function listReviewQueue(request: Request, env: Env): Promise<Response> {
   const [places, deals, events] = await env.DB.batch([
     env.DB.prepare(`
       SELECT id, name, meal_name, cuisine, price_label, address, location_note,
-             source_url, verification_status, last_checked_at, check_after, created_at
+             source_url, latitude, longitude, coordinate_source_url, coordinate_checked_at,
+             verification_status, last_checked_at, check_after, created_at
       FROM baroke_places
       WHERE verification_status IN ('pending', 'needs_review')
       ORDER BY CASE verification_status WHEN 'needs_review' THEN 0 ELSE 1 END,
@@ -403,12 +421,23 @@ async function decidePlaceReview(
   const today = occurredAt.slice(0, 10);
   const sourceUrl = String(input.source_url ?? place.source_url ?? "").trim();
   const checkAfter = String(input.check_after ?? "").trim();
+  const latitudeInput = input.latitude === undefined || input.latitude === null || input.latitude === "" ? null : Number(input.latitude);
+  const longitudeInput = input.longitude === undefined || input.longitude === null || input.longitude === "" ? null : Number(input.longitude);
+  const coordinateSourceUrl = String(input.coordinate_source_url ?? "").trim();
+  const suppliedCoordinatePart = latitudeInput !== null || longitudeInput !== null || Boolean(coordinateSourceUrl);
   if (decision === "verify") {
     if (!/^https?:\/\//i.test(sourceUrl)) {
       return json({ error: "Verification requires an http:// or https:// evidence link." }, 422);
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(checkAfter) || checkAfter <= today) {
       return json({ error: "Verification requires a future YYYY-MM-DD recheck date." }, 422);
+    }
+    if (suppliedCoordinatePart && (
+      latitudeInput === null || !Number.isFinite(latitudeInput) || latitudeInput < -90 || latitudeInput > 90
+      || longitudeInput === null || !Number.isFinite(longitudeInput) || longitudeInput < -180 || longitudeInput > 180
+      || !/^https?:\/\//i.test(coordinateSourceUrl)
+    )) {
+      return json({ error: "Coordinates require valid latitude, longitude, and an evidence URL." }, 422);
     }
   }
   const eventType = decision === "reject"
@@ -436,9 +465,16 @@ async function decidePlaceReview(
     ? env.DB.prepare(`
         UPDATE baroke_places
         SET verification_status = 'verified', source_url = ?,
-            last_checked_at = ?, check_after = ?
+            last_checked_at = ?, check_after = ?,
+            latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude),
+            coordinate_source_url = COALESCE(?, coordinate_source_url),
+            coordinate_checked_at = CASE WHEN ? IS NULL THEN coordinate_checked_at ELSE ? END
         WHERE id = ? AND verification_status = ?
-      `).bind(sourceUrl, occurredAt, checkAfter, placeId, previousStatus)
+      `).bind(
+        sourceUrl, occurredAt, checkAfter,
+        latitudeInput, longitudeInput, coordinateSourceUrl || null,
+        latitudeInput, today, placeId, previousStatus,
+      )
     : env.DB.prepare(`
         UPDATE baroke_places
         SET verification_status = 'rejected', check_after = NULL

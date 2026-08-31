@@ -10,6 +10,10 @@ export type BarokePlace = {
   locationNote: string;
   studentDiscount: boolean;
   sourceUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  coordinateSourceUrl: string | null;
+  coordinateCheckedAt: string | null;
   verificationStatus: "verified" | "needs_review" | "pending" | "rejected";
   lastCheckedAt: string | null;
   checkAfter: string | null;
@@ -28,6 +32,10 @@ type PlaceRow = {
   location_note: string;
   student_discount: number;
   source_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  coordinate_source_url: string | null;
+  coordinate_checked_at: string | null;
   verification_status: BarokePlace["verificationStatus"];
   last_checked_at: string | null;
   check_after: string | null;
@@ -78,6 +86,10 @@ export type ReviewPlace = {
   address: string;
   location_note: string;
   source_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  coordinate_source_url: string | null;
+  coordinate_checked_at: string | null;
   verification_status: "pending" | "needs_review";
   last_checked_at: string | null;
   check_after: string | null;
@@ -170,6 +182,9 @@ export function decidePlaceReview(
     reason: string;
     source_url?: string;
     check_after?: string;
+    latitude?: number;
+    longitude?: number;
+    coordinate_source_url?: string;
     client_command_id: string;
   },
 ): Promise<{ id: string; status: "verified" | "rejected"; idempotent: boolean }> {
@@ -216,6 +231,10 @@ export async function loadBarokePlaces(signal: AbortSignal): Promise<BarokePlace
     locationNote: place.location_note,
     studentDiscount: place.student_discount === 1,
     sourceUrl: place.source_url,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    coordinateSourceUrl: place.coordinate_source_url,
+    coordinateCheckedAt: place.coordinate_checked_at,
     verificationStatus: place.verification_status,
     lastCheckedAt: place.last_checked_at,
     checkAfter: place.check_after,

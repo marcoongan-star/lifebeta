@@ -14,6 +14,10 @@ export const createPlacesTable = `
     location_note TEXT NOT NULL,
     student_discount INTEGER NOT NULL DEFAULT 0 CHECK (student_discount IN (0, 1)),
     source_url TEXT,
+    latitude REAL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+    longitude REAL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+    coordinate_source_url TEXT,
+    coordinate_checked_at TEXT,
     verification_status TEXT NOT NULL DEFAULT 'pending'
       CHECK (verification_status IN ('pending', 'verified', 'needs_review', 'rejected')),
     last_checked_at TEXT,
@@ -135,6 +139,14 @@ export const seedVerifiedPlaces = [
   ["ten-ichi-178-fifth", "Ten Ichi Mart", "Prepared sushi and hot food", "Japanese market", null, null, "50% AFTER 8", "178 Fifth Ave, New York, NY 10010", "Flatiron · daily until 9:30 PM", 0, "https://www.tenichimart.com/contact-us", "2026-08-24T00:00:00Z", "2026-09-07", "2026-08-24T00:00:00Z"],
   ["jin-mei-25b-henry", "Jin Mei Dumpling", "15 pan-fried pork and chive dumplings", "Chinese", 500, 500, "$5", "25B Henry St B, New York, NY 10002", "Chinatown · daily 11 AM–8:30 PM", 0, "https://jinmeidumpling.com/about/", "2026-08-24T00:00:00Z", "2026-09-24", "2026-08-24T00:00:00Z"],
   ["que-rico-221-e-23rd", "Que Rico", "Dominican lunch special", "Dominican", 1000, 1000, "$10 LUNCH", "221 E 23rd St, New York, NY 10010", "Two blocks from Baruch · noon–3 PM", 0, "https://theticker.org/17547/arts/arts-amp-style/food-for-thought-with-andres-que-rico-restaurant/", "2026-08-24T00:00:00Z", "2026-09-07", "2026-08-24T00:00:00Z"],
+] as const;
+
+export const seedVerifiedCoordinates = [
+  ["chipotle-125-e-23rd", 40.73984, -73.98513, "https://www.openstreetmap.org/?mlat=40.73984&mlon=-73.98513#map=19/40.73984/-73.98513", "2026-08-30"],
+  ["mcdonalds-26-e-23rd", 40.74063, -73.98785, "https://www.openstreetmap.org/?mlat=40.74063&mlon=-73.98785#map=19/40.74063/-73.98785", "2026-08-30"],
+  ["subway-170-w-23rd", 40.743733, -73.995326, "https://www.openstreetmap.org/?mlat=40.743733&mlon=-73.995326#map=19/40.743733/-73.995326", "2026-08-30"],
+  ["ten-ichi-178-fifth", 40.74122, -73.99009, "https://www.openstreetmap.org/?mlat=40.74122&mlon=-73.99009#map=19/40.74122/-73.99009", "2026-08-30"],
+  ["que-rico-221-e-23rd", 40.7386, -73.98186, "https://www.openstreetmap.org/?mlat=40.7386&mlon=-73.98186#map=19/40.7386/-73.98186", "2026-08-30"],
 ] as const;
 
 export const seedPlaceDeals = [

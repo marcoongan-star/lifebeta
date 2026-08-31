@@ -110,6 +110,9 @@ function PlaceDecision({ place, reviewKey, onComplete }: { place: ReviewPlace; r
   const [reason, setReason] = useState("");
   const [sourceUrl, setSourceUrl] = useState(place.source_url ?? "");
   const [checkAfter, setCheckAfter] = useState("");
+  const [latitude, setLatitude] = useState(place.latitude?.toString() ?? "");
+  const [longitude, setLongitude] = useState(place.longitude?.toString() ?? "");
+  const [coordinateSourceUrl, setCoordinateSourceUrl] = useState(place.coordinate_source_url ?? "");
   const [busy, setBusy] = useState<"verify" | "reject" | null>(null);
   const [error, setError] = useState("");
 
@@ -122,6 +125,9 @@ function PlaceDecision({ place, reviewKey, onComplete }: { place: ReviewPlace; r
         reason,
         source_url: sourceUrl,
         check_after: checkAfter,
+        latitude: latitude ? Number(latitude) : undefined,
+        longitude: longitude ? Number(longitude) : undefined,
+        coordinate_source_url: coordinateSourceUrl || undefined,
         client_command_id: crypto.randomUUID(),
       });
       onComplete();
@@ -131,5 +137,5 @@ function PlaceDecision({ place, reviewKey, onComplete }: { place: ReviewPlace; r
     }
   }
 
-  return <article className="review-place-card"><header><span>{place.verification_status.replace("_", " ")}</span><small>{place.created_at.slice(0, 10)}</small></header><h3>{place.name}</h3><p>{place.meal_name} · {place.cuisine} · {place.price_label}</p><address>{place.address}{place.location_note ? ` · ${place.location_note}` : ""}</address><div className="review-fields"><label>EVIDENCE URL<input type="url" value={sourceUrl} placeholder="https://…" onChange={(event) => setSourceUrl(event.target.value)} /></label><label>NEXT RECHECK<input type="date" value={checkAfter} onChange={(event) => setCheckAfter(event.target.value)} /></label><label className="review-reason">SPECIFIC DECISION REASON<textarea required minLength={8} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="What did the evidence establish?" /></label></div><div className="review-actions"><button className="reject" disabled={busy !== null || reason.length < 8} onClick={() => void decide("reject")}>{busy === "reject" ? "Rejecting…" : "Reject"}</button><button className="verify" disabled={busy !== null || reason.length < 8 || !sourceUrl || !checkAfter} onClick={() => void decide("verify")}>{busy === "verify" ? "Verifying…" : place.verification_status === "needs_review" ? "Re-verify →" : "Verify →"}</button></div>{error && <p className="review-error" role="alert">{error}</p>}</article>;
+  return <article className="review-place-card"><header><span>{place.verification_status.replace("_", " ")}</span><small>{place.created_at.slice(0, 10)}</small></header><h3>{place.name}</h3><p>{place.meal_name} · {place.cuisine} · {place.price_label}</p><address>{place.address}{place.location_note ? ` · ${place.location_note}` : ""}</address><div className="review-fields"><label>EVIDENCE URL<input type="url" value={sourceUrl} placeholder="https://…" onChange={(event) => setSourceUrl(event.target.value)} /></label><label>NEXT RECHECK<input type="date" value={checkAfter} onChange={(event) => setCheckAfter(event.target.value)} /></label><label>LATITUDE · OPTIONAL<input type="number" min="-90" max="90" step="any" value={latitude} onChange={(event) => setLatitude(event.target.value)} /></label><label>LONGITUDE · OPTIONAL<input type="number" min="-180" max="180" step="any" value={longitude} onChange={(event) => setLongitude(event.target.value)} /></label><label className="review-reason">COORDINATE SOURCE · REQUIRED WITH COORDINATES<input type="url" value={coordinateSourceUrl} placeholder="https://…" onChange={(event) => setCoordinateSourceUrl(event.target.value)} /></label><label className="review-reason">SPECIFIC DECISION REASON<textarea required minLength={8} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="What did the evidence establish?" /></label></div><div className="review-actions"><button className="reject" disabled={busy !== null || reason.length < 8} onClick={() => void decide("reject")}>{busy === "reject" ? "Rejecting…" : "Reject"}</button><button className="verify" disabled={busy !== null || reason.length < 8 || !sourceUrl || !checkAfter} onClick={() => void decide("verify")}>{busy === "verify" ? "Verifying…" : place.verification_status === "needs_review" ? "Re-verify →" : "Verify →"}</button></div>{error && <p className="review-error" role="alert">{error}</p>}</article>;
 }

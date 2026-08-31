@@ -12,6 +12,7 @@ function migratedDatabase() {
     "0004_review_audit_queue.sql",
     "0005_place_review_decisions.sql",
     "0006_deal_review_decisions.sql",
+    "0007_verified_place_coordinates.sql",
   ]) {
     database.exec(readFileSync(new URL(`../drizzle/${migration}`, import.meta.url), "utf8"));
   }
@@ -28,6 +29,14 @@ test("applies the complete Baroke schema with seeded directory records", () => {
   );
   assert.equal(database.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS count FROM baroke_places WHERE latitude IS NOT NULL AND longitude IS NOT NULL").get().count,
+    5,
+  );
+  assert.throws(
+    () => database.prepare("UPDATE baroke_places SET latitude = 91 WHERE id = ?").run("chipotle-125-e-23rd"),
+    /CHECK constraint failed/,
+  );
 });
 
 test("keeps review history append-only", () => {
