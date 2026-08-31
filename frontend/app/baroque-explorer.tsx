@@ -11,6 +11,25 @@ import {
 
 type DatabaseState = "loading" | "ready" | "unavailable";
 type SubmissionState = "idle" | "saving" | "saved" | "error";
+type DistanceLimit = "all" | 0.25 | 0.5 | 1;
+
+const BARUCH_CAMPUS = { latitude: 40.740173, longitude: -73.98337 };
+
+function distanceFromBaruch(place: BarokePlace): number | null {
+  if (place.latitude === null || place.longitude === null) return null;
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(place.latitude - BARUCH_CAMPUS.latitude);
+  const longitudeDelta = radians(place.longitude - BARUCH_CAMPUS.longitude);
+  const startLatitude = radians(BARUCH_CAMPUS.latitude);
+  const endLatitude = radians(place.latitude);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(startLatitude) * Math.cos(endLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(haversine));
+}
+
+function walkingDirections(address: string): string {
+  return `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${encodeURIComponent(address)}`;
+}
 
 function formatDealDate(value: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
@@ -23,6 +42,7 @@ export function BarokeExplorer() {
   const [maxPrice, setMaxPrice] = useState(12);
   const [location, setLocation] = useState("");
   const [dealOnly, setDealOnly] = useState(false);
+  const [distanceLimit, setDistanceLimit] = useState<DistanceLimit>("all");
   const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(null);
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
   const [dealState, setDealState] = useState<DatabaseState>("loading");
@@ -31,12 +51,13 @@ export function BarokeExplorer() {
 
   const filtered = useMemo(() => {
     const query = location.trim().toLowerCase();
-    return places.filter((place) => {
+    return places.map((place) => ({ place, distanceMiles: distanceFromBaruch(place) })).filter(({ place, distanceMiles }) => {
       const locationMatches = !query || `${place.address} ${place.locationNote}`.toLowerCase().includes(query);
       const priceMatches = place.priceMin === null ? place.deals.length > 0 : place.priceMin <= maxPrice;
-      return priceMatches && locationMatches && (!dealOnly || place.deals.length > 0);
-    });
-  }, [dealOnly, location, maxPrice, places]);
+      const distanceMatches = distanceLimit === "all" || (distanceMiles !== null && distanceMiles <= distanceLimit);
+      return priceMatches && locationMatches && distanceMatches && (!dealOnly || place.deals.length > 0);
+    }).sort((left, right) => (left.distanceMiles ?? Number.POSITIVE_INFINITY) - (right.distanceMiles ?? Number.POSITIVE_INFINITY));
+  }, [dealOnly, distanceLimit, location, maxPrice, places]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -90,6 +111,7 @@ export function BarokeExplorer() {
         <div className="filter-bar">
           <fieldset><legend>MEAL PRICE</legend>{[8, 12, 16].map((price) => <button type="button" className={maxPrice === price ? "active" : ""} onClick={() => setMaxPrice(price)} key={price}>Up to ${price}</button>)}</fieldset>
           <label>LOCATION<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Street or neighborhood" /></label>
+          <fieldset><legend>FROM BARUCH</legend>{(["all", 0.25, 0.5, 1] as const).map((distance) => <button type="button" className={distanceLimit === distance ? "active" : ""} onClick={() => setDistanceLimit(distance)} key={distance}>{distance === "all" ? "Any" : `≤ ${distance} mi`}</button>)}</fieldset>
           <label className="discount-toggle"><input type="checkbox" checked={dealOnly} onChange={(event) => setDealOnly(event.target.checked)} /><span />Current deal only</label>
           <div className="result-count"><strong>{filtered.length}</strong><span>verified places</span></div>
         </div>
@@ -99,19 +121,19 @@ export function BarokeExplorer() {
             {databaseState === "loading" && <div className="no-matches"><strong>Loading verified places…</strong></div>}
             {databaseState === "unavailable" && <div className="no-matches"><strong>Place database is temporarily unavailable.</strong><p>You can still add a place below and try again shortly.</p></div>}
             {databaseState === "ready" && filtered.length === 0 && <div className="no-matches"><strong>No verified matches yet.</strong><p>Add a place below. New submissions stay private until they pass review.</p></div>}
-            {databaseState === "ready" && filtered.map((place) => {
+            {databaseState === "ready" && filtered.map(({ place, distanceMiles }) => {
               const expanded = expandedPlaceId === place.id;
               return (
                 <article className={`verified-place${expanded ? " expanded" : ""}`} key={place.id}>
                   <button className="place-summary" type="button" aria-expanded={expanded} onClick={() => setExpandedPlaceId(expanded ? null : place.id)}>
                     <span className="place-price">{place.priceLabel}<small>{place.priceMin === null ? "current offer" : "meal price"}</small></span>
                     <span className="place-copy"><small>{place.cuisine} · {place.address}</small><strong>{place.name}</strong><span>{[place.mealName, place.locationNote].filter(Boolean).join(" · ")}</span></span>
-                    <span className="place-badges">{place.deals.length > 0 && <i className="current-deal">✓ CURRENT DEAL</i>}{place.studentDiscount && <i>STUDENT DISCOUNT</i>}<i>VERIFIED</i></span>
+                    <span className="place-badges">{distanceMiles !== null && <i>{distanceMiles.toFixed(2)} MI FROM BARUCH</i>}{place.deals.length > 0 && <i className="current-deal">✓ CURRENT DEAL</i>}{place.studentDiscount && <i>STUDENT DISCOUNT</i>}<i>VERIFIED</i></span>
                     <b className="place-expand" aria-hidden="true">{expanded ? "−" : "+"}</b>
                   </button>
                   {expanded && (
                     <div className="place-deal-drawer">
-                      <div className="place-deal-head"><span>{place.deals.length} CURRENT {place.deals.length === 1 ? "OFFER" : "OFFERS"}</span>{place.sourceUrl && <a href={place.sourceUrl} target="_blank" rel="noreferrer">Place source ↗</a>}</div>
+                      <div className="place-deal-head"><span>{place.deals.length} CURRENT {place.deals.length === 1 ? "OFFER" : "OFFERS"}</span><div><a href={walkingDirections(place.address)} target="_blank" rel="noreferrer">Walking map ↗</a>{place.coordinateSourceUrl && <a href={place.coordinateSourceUrl} target="_blank" rel="noreferrer">Coordinate source ↗</a>}{place.sourceUrl && <a href={place.sourceUrl} target="_blank" rel="noreferrer">Place source ↗</a>}</div></div>
                       {place.deals.length === 0 && <p>No linked deal is current. The place itself is still verified.</p>}
                       {place.deals.map((deal) => (
                         <article key={deal.id}>

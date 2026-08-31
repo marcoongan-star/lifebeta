@@ -54,7 +54,7 @@ footer { padding:24px clamp(20px,5vw,80px); display:flex; justify-content:space-
 .base-metrics article:last-child span { color:#526032; }
 .source-line { display:block; padding:20px 0; }
 .source-line p { max-width:900px; line-height:1.65; }
-.filter-bar { grid-template-columns:1.5fr 1fr 1fr auto; }
+.filter-bar { grid-template-columns:1.25fr 1fr 1.2fr .8fr auto; }
 .filter-bar>label:not(.discount-toggle) input { min-height:35px; padding:0 9px; color:#17231f; background:#f8f6f0; border:1px solid #d8d5cb; font-size:9px; }
 .verified-grid { min-height:430px; display:grid; grid-template-columns:1.3fr .7fr; gap:18px; }
 .verified-place { color:#17231f; border-bottom:1px solid #e5e1d8; }
@@ -72,6 +72,7 @@ footer { padding:24px clamp(20px,5vw,80px); display:flex; justify-content:space-
 .place-expand { font:400 24px Georgia,serif; }
 .place-deal-drawer { padding:0 18px 20px 102px; }
 .place-deal-head { padding:13px 0; display:flex; justify-content:space-between; gap:14px; border-top:1px solid #dcd8cc; color:#6f786f; font-size:7px; font-weight:850; letter-spacing:.8px; }
+.place-deal-head>div { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px 12px; }
 .place-deal-head a,.place-deal-drawer footer a { color:#3d582a; border-bottom:1px solid #899a7b; }
 .place-deal-drawer>article { margin-top:10px; padding:18px; background:#fff; border-left:4px solid #347a58; box-shadow:0 8px 20px rgba(23,35,31,.06); }
 .place-deal-drawer>article>div { display:flex; align-items:center; gap:9px; }
