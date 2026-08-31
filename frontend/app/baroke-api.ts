@@ -53,6 +53,13 @@ export type PlaceSubmission = {
   source_url: string;
 };
 
+export type DealSubmission = {
+  title: string;
+  details: string;
+  requirement: string;
+  source_url: string;
+};
+
 export type BarokeDeal = {
   id: string;
   brand: string;
@@ -101,10 +108,10 @@ export type ReviewDeal = {
   brand: string;
   title: string;
   source_url: string;
-  status: "needs_review" | "expired";
-  verified_at: string;
+  status: "pending" | "needs_review" | "expired";
+  verified_at: string | null;
   expires_at: string | null;
-  check_after: string;
+  check_after: string | null;
 };
 
 export type ReviewEvent = {
@@ -261,6 +268,18 @@ export async function submitBarokePlace(submission: PlaceSubmission): Promise<vo
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ error: "Place could not be saved." })) as { error?: string };
     throw new Error(payload.error ?? "Place could not be saved.");
+  }
+}
+
+export async function submitBarokeDeal(placeId: string, submission: DealSubmission): Promise<void> {
+  const response = await fetch(`/api/places/${encodeURIComponent(placeId)}/deals`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(submission),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error ?? "Deal could not be saved.");
   }
 }
 

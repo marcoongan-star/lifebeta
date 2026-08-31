@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   loadBarokeDeals,
   loadBarokePlaces,
+  submitBarokeDeal,
   submitBarokePlace,
   type BarokeDeal,
   type BarokePlace,
@@ -48,6 +49,8 @@ export function BarokeExplorer() {
   const [dealState, setDealState] = useState<DatabaseState>("loading");
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [submissionMessage, setSubmissionMessage] = useState("");
+  const [dealSubmissionState, setDealSubmissionState] = useState<SubmissionState>("idle");
+  const [dealSubmissionMessage, setDealSubmissionMessage] = useState("");
 
   const filtered = useMemo(() => {
     const query = location.trim().toLowerCase();
@@ -99,6 +102,28 @@ export function BarokeExplorer() {
     } catch (error) {
       setSubmissionState("error");
       setSubmissionMessage(error instanceof Error ? error.message : "Place could not be saved.");
+    }
+  }
+
+  async function handleDealSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDealSubmissionState("saving");
+    setDealSubmissionMessage("");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      await submitBarokeDeal(String(data.get("place_id") ?? ""), {
+        title: String(data.get("title") ?? ""),
+        details: String(data.get("details") ?? ""),
+        requirement: String(data.get("requirement") ?? ""),
+        source_url: String(data.get("source_url") ?? ""),
+      });
+      form.reset();
+      setDealSubmissionState("saved");
+      setDealSubmissionMessage("Saved for review. The offer stays private until its proof and terms are checked.");
+    } catch (error) {
+      setDealSubmissionState("error");
+      setDealSubmissionMessage(error instanceof Error ? error.message : "Deal could not be saved.");
     }
   }
 
@@ -200,6 +225,18 @@ export function BarokeExplorer() {
           <label className="form-check"><input name="student_discount" type="checkbox" />This place offers a student discount</label>
           <button type="submit" disabled={submissionState === "saving"}>{submissionState === "saving" ? "Saving…" : "Submit for verification →"}</button>
           {submissionMessage && <p className={submissionState === "error" ? "form-message error" : "form-message"}>{submissionMessage}</p>}
+        </form>
+      </section>
+      <section className="submit-section" id="add-deal">
+        <div><h2>Add a deal.</h2><p>Found a student discount, late-night markdown, or app offer? Link it to a verified place. It stays private until the evidence is checked.</p></div>
+        <form onSubmit={handleDealSubmit}>
+          <label>VERIFIED PLACE<select name="place_id" required defaultValue=""><option value="" disabled>Choose a place</option>{places.map((place) => <option key={place.id} value={place.id}>{place.name} · {place.address}</option>)}</select></label>
+          <label>DEAL TITLE<input name="title" required minLength={3} placeholder="50% off after 8 PM" /></label>
+          <label className="form-wide">WHAT THE DEAL INCLUDES<input name="details" required minLength={8} placeholder="Which items, times, or order method qualify?" /></label>
+          <label className="form-wide">TERMS · OPTIONAL<input name="requirement" placeholder="App required, weekday only, while supplies last…" /></label>
+          <label className="form-wide">PROOF LINK<input name="source_url" required type="url" placeholder="https://…" /></label>
+          <button type="submit" disabled={dealSubmissionState === "saving" || places.length === 0}>{dealSubmissionState === "saving" ? "Saving…" : "Submit deal for verification →"}</button>
+          {dealSubmissionMessage && <p className={dealSubmissionState === "error" ? "form-message error" : "form-message"}>{dealSubmissionMessage}</p>}
         </form>
       </section>
     </>

@@ -89,6 +89,7 @@ footer { padding:24px clamp(20px,5vw,80px); display:flex; justify-content:space-
 .verification-panel li p { margin:4px 0 0; color:#b2c0bb; font-size:8px; line-height:1.6; }
 .submit-section { grid-template-columns:.7fr 1.3fr; }
 .submit-section form label:nth-child(2) { grid-column:auto; }
+.submit-section select { width:100%; padding:12px; color:#17231f; background:#f6f3ea; border:1px solid #d9d5ca; font:9px Arial,sans-serif; }
 .submit-section form .form-wide,.submit-section form .form-check,.submit-section form .form-message { grid-column:1/-1; }
 .submit-section form .form-check { display:flex; align-items:center; gap:9px; }
 .submit-section form .form-check input { width:auto; }

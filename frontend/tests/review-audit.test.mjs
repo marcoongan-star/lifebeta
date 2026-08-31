@@ -13,6 +13,7 @@ function migratedDatabase() {
     "0005_place_review_decisions.sql",
     "0006_deal_review_decisions.sql",
     "0007_verified_place_coordinates.sql",
+    "0008_community_deal_submissions.sql",
   ]) {
     database.exec(readFileSync(new URL(`../drizzle/${migration}`, import.meta.url), "utf8"));
   }
@@ -242,5 +243,38 @@ test("supports audited deal re-confirmation and rejection", () => {
     () => database.prepare("UPDATE baroke_review_events SET reason = 'changed' WHERE id = ?")
       .run("deal-command-reconfirm"),
     /review events are immutable/,
+  );
+});
+
+test("stores community deals as private pending records linked to one place", () => {
+  const database = migratedDatabase();
+  database.prepare(`
+    INSERT INTO baroke_deals (
+      id, brand, title, details, requirement, source_url,
+      verified_at, expires_at, check_after, status
+    ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'pending')
+  `).run(
+    "community-deal",
+    "Chipotle",
+    "Student-reported offer",
+    "Proof needs manual review.",
+    "Check location terms.",
+    "https://example.com/proof",
+  );
+  database.prepare(`
+    INSERT INTO baroke_place_deals (place_id, deal_id) VALUES (?, ?)
+  `).run("chipotle-125-e-23rd", "community-deal");
+
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS count FROM baroke_deals WHERE status = 'pending'").get().count,
+    1,
+  );
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS count FROM baroke_deals WHERE status = 'confirmed'").get().count,
+    10,
+  );
+  assert.equal(
+    database.prepare("SELECT place_id FROM baroke_place_deals WHERE deal_id = ?").get("community-deal").place_id,
+    "chipotle-125-e-23rd",
   );
 });
