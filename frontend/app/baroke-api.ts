@@ -72,6 +72,14 @@ export type BarokeDeal = {
   checkAfter: string;
 };
 
+export type BarokeDealFreshness = {
+  asOf: string;
+  confirmedCount: number;
+  expiresWithinSevenDays: number;
+  rechecksWithinSevenDays: number;
+  nextBoundary: string | null;
+};
+
 type DealRow = {
   id: string;
   brand: string;
@@ -283,22 +291,40 @@ export async function submitBarokeDeal(placeId: string, submission: DealSubmissi
   }
 }
 
-export async function loadBarokeDeals(signal: AbortSignal): Promise<BarokeDeal[]> {
+export async function loadBarokeDeals(signal: AbortSignal): Promise<{ deals: BarokeDeal[]; freshness: BarokeDealFreshness }> {
   const response = await fetch("/api/deals", {
     signal,
     headers: { accept: "application/json" },
   });
   if (!response.ok) throw new Error("Baroke deal database unavailable");
-  const payload = await response.json() as { deals: DealRow[] };
-  return payload.deals.map((deal) => ({
-    id: deal.id,
-    brand: deal.brand,
-    title: deal.title,
-    details: deal.details,
-    requirement: deal.requirement,
-    sourceUrl: deal.source_url,
-    verifiedAt: deal.verified_at,
-    expiresAt: deal.expires_at,
-    checkAfter: deal.check_after,
-  }));
+  const payload = await response.json() as {
+    deals: DealRow[];
+    freshness: {
+      as_of: string;
+      confirmed_count: number;
+      expires_within_7_days: number;
+      rechecks_within_7_days: number;
+      next_boundary: string | null;
+    };
+  };
+  return {
+    deals: payload.deals.map((deal) => ({
+      id: deal.id,
+      brand: deal.brand,
+      title: deal.title,
+      details: deal.details,
+      requirement: deal.requirement,
+      sourceUrl: deal.source_url,
+      verifiedAt: deal.verified_at,
+      expiresAt: deal.expires_at,
+      checkAfter: deal.check_after,
+    })),
+    freshness: {
+      asOf: payload.freshness.as_of,
+      confirmedCount: payload.freshness.confirmed_count,
+      expiresWithinSevenDays: payload.freshness.expires_within_7_days,
+      rechecksWithinSevenDays: payload.freshness.rechecks_within_7_days,
+      nextBoundary: payload.freshness.next_boundary,
+    },
+  };
 }

@@ -644,14 +644,42 @@ async function decideDealReview(
 async function listDeals(env: Env): Promise<Response> {
   await ensureContentSchema(env.DB);
   await sweepStaleDeals(env.DB);
-  const result = await env.DB.prepare(`
-    SELECT id, brand, title, details, requirement, source_url,
-           verified_at, expires_at, check_after
-    FROM baroke_deals
-    WHERE status = 'confirmed'
-    ORDER BY brand, title
-  `).all();
-  return json({ deals: result.results });
+  const [result, freshness] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, brand, title, details, requirement, source_url,
+             verified_at, expires_at, check_after
+      FROM baroke_deals
+      WHERE status = 'confirmed'
+      ORDER BY brand, title
+    `),
+    env.DB.prepare(`
+      SELECT
+        COUNT(*) AS confirmed_count,
+        COALESCE(SUM(CASE
+          WHEN expires_at IS NOT NULL
+           AND expires_at BETWEEN date('now') AND date('now', '+7 days')
+          THEN 1 ELSE 0 END), 0) AS expires_within_7_days,
+        COALESCE(SUM(CASE
+          WHEN expires_at IS NULL
+           AND check_after BETWEEN date('now') AND date('now', '+7 days')
+          THEN 1 ELSE 0 END), 0) AS rechecks_within_7_days,
+        MIN(COALESCE(expires_at, check_after)) AS next_boundary
+      FROM baroke_deals
+      WHERE status = 'confirmed'
+    `),
+  ]);
+  return json({
+    deals: result.results,
+    freshness: {
+      as_of: new Date().toISOString(),
+      ...(freshness.results[0] ?? {
+        confirmed_count: 0,
+        expires_within_7_days: 0,
+        rechecks_within_7_days: 0,
+        next_boundary: null,
+      }),
+    },
+  });
 }
 
 // Image security config. SVG sources with .svg extension auto-skip the

@@ -278,3 +278,38 @@ test("stores community deals as private pending records linked to one place", ()
     "chipotle-125-e-23rd",
   );
 });
+
+test("summarizes upcoming deal trust boundaries without publishing stale states", () => {
+  const database = migratedDatabase();
+  database.prepare("UPDATE baroke_deals SET status = 'rejected'").run();
+  const insert = database.prepare(`
+    INSERT INTO baroke_deals (
+      id, brand, title, details, requirement, source_url,
+      verified_at, expires_at, check_after, status
+    ) VALUES (?, 'Test', ?, 'Details', 'Terms', 'https://example.com',
+              '2026-09-01', ?, ?, 'confirmed')
+  `);
+  insert.run("ending-soon", "Ending soon", "2026-09-06", "2026-09-06");
+  insert.run("recheck-soon", "Recheck soon", null, "2026-09-08");
+  insert.run("later", "Later", null, "2026-10-01");
+
+  const summary = database.prepare(`
+    SELECT
+      COUNT(*) AS confirmed_count,
+      SUM(CASE WHEN expires_at IS NOT NULL
+        AND expires_at BETWEEN date('2026-09-03') AND date('2026-09-03', '+7 days')
+        THEN 1 ELSE 0 END) AS expires_within_7_days,
+      SUM(CASE WHEN expires_at IS NULL
+        AND check_after BETWEEN date('2026-09-03') AND date('2026-09-03', '+7 days')
+        THEN 1 ELSE 0 END) AS rechecks_within_7_days,
+      MIN(COALESCE(expires_at, check_after)) AS next_boundary
+    FROM baroke_deals WHERE status = 'confirmed'
+  `).get();
+
+  assert.deepEqual({ ...summary }, {
+    confirmed_count: 3,
+    expires_within_7_days: 1,
+    rechecks_within_7_days: 1,
+    next_boundary: "2026-09-06",
+  });
+});
