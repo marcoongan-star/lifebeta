@@ -7,6 +7,7 @@ import {
   submitBarokeDeal,
   submitBarokePlace,
   type BarokeDeal,
+  type BarokeDealFreshness,
   type BarokePlace,
 } from "./baroke-api";
 
@@ -34,12 +35,13 @@ function walkingDirections(address: string): string {
 
 function formatDealDate(value: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
-    .format(new Date(`${value}T12:00:00Z`));
+    .format(new Date(value.includes("T") ? value : `${value}T12:00:00Z`));
 }
 
 export function BarokeExplorer() {
   const [places, setPlaces] = useState<BarokePlace[]>([]);
   const [deals, setDeals] = useState<BarokeDeal[]>([]);
+  const [freshness, setFreshness] = useState<BarokeDealFreshness | null>(null);
   const [maxPrice, setMaxPrice] = useState(12);
   const [location, setLocation] = useState("");
   const [dealOnly, setDealOnly] = useState(false);
@@ -72,7 +74,8 @@ export function BarokeExplorer() {
       .catch(() => setDatabaseState("unavailable"));
     loadBarokeDeals(controller.signal)
       .then((next) => {
-        setDeals(next);
+        setDeals(next.deals);
+        setFreshness(next.freshness);
         setDealState("ready");
       })
       .catch(() => setDealState("unavailable"));
@@ -188,8 +191,14 @@ export function BarokeExplorer() {
 
       <section className="deals-section" id="deals">
         <div className="baroque-section-head inverse">
-          <div><span>SOURCE-CHECKED AUGUST 24, 2026</span><h2>Confirmed deals.</h2></div>
+          <div><span>DATABASE-ENFORCED FRESHNESS</span><h2>Confirmed deals.</h2></div>
           <p>Terms and participation can vary by location. Open the original source before ordering.</p>
+        </div>
+        <div className="freshness-ledger">
+          <div><small>PUBLIC NOW</small><strong>{freshness?.confirmedCount ?? "—"}</strong><span>confirmed offers</span></div>
+          <div><small>ENDING IN 7 DAYS</small><strong>{freshness?.expiresWithinSevenDays ?? "—"}</strong><span>hidden after their deadline</span></div>
+          <div><small>RECHECKS IN 7 DAYS</small><strong>{freshness?.rechecksWithinSevenDays ?? "—"}</strong><span>removed if not renewed</span></div>
+          <div><small>NEXT TRUST BOUNDARY</small><strong>{freshness?.nextBoundary ? formatDealDate(freshness.nextBoundary) : "—"}</strong><span>{freshness ? `Snapshot ${formatDealDate(freshness.asOf)}` : "loading current status"}</span></div>
         </div>
         <div className="deal-grid">
           {dealState === "loading" && <div className="deal-empty"><strong>Loading confirmed deals…</strong></div>}
@@ -206,6 +215,7 @@ export function BarokeExplorer() {
                 <i>CONFIRMED</i>
                 <a href={deal.sourceUrl} target="_blank" rel="noreferrer">Original source ↗</a>
               </div>
+              <span className="deal-checked">Checked {formatDealDate(deal.verifiedAt)}</span>
               <span className="deal-validity">{deal.expiresAt ? `Ends ${formatDealDate(deal.expiresAt)}` : `Recheck by ${formatDealDate(deal.checkAfter)}`}</span>
             </article>
           ))}
