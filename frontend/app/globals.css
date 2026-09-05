@@ -69,6 +69,8 @@ footer { padding:24px clamp(20px,5vw,80px); display:flex; justify-content:space-
 .place-badges { display:grid; gap:5px; justify-items:end; }
 .place-badges i { padding:6px; color:#41521e; background:#edf7cf; font-size:6px; font-style:normal; font-weight:850; white-space:nowrap; }
 .place-badges i.current-deal { color:#fff; background:#347a58; }
+.place-badges i.match-score { color:#17231f; background:#d9ff63; }
+.sort-control { display:grid; gap:5px; color:#6f786f; font-size:7px; font-weight:850; letter-spacing:.7px; }.sort-control select { min-width:120px; padding:10px; border:1px solid #d7d8cf; color:#17231f; background:#fff; font-size:9px; }.rank-explanation { display:flex; flex-wrap:wrap; gap:7px 12px; margin-bottom:12px; padding:11px 0; border-bottom:1px solid #dcd8cc; color:#6f786f; font-size:7px; }.rank-explanation strong { width:100%; color:#3d582a; font-size:7px; letter-spacing:.7px; }
 .place-expand { font:400 24px Georgia,serif; }
 .place-deal-drawer { padding:0 18px 20px 102px; }
 .place-deal-head { padding:13px 0; display:flex; justify-content:space-between; gap:14px; border-top:1px solid #dcd8cc; color:#6f786f; font-size:7px; font-weight:850; letter-spacing:.8px; }

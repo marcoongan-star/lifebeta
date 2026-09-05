@@ -42,6 +42,8 @@ test("server-renders the simplified Baroke place experience", async () => {
   assert.match(html, /FROM BARUCH/i);
   assert.match(html, /≤ 0\.5 mi/i);
   assert.match(html, /Current deal only/i);
+  assert.match(html, /Best match/i);
+  assert.match(html, /Lowest price/i);
   assert.match(html, /Add a place/i);
   assert.match(html, /MEAL PRICE/i);
   assert.match(html, /class="hero-proof"><span>POWERED BY LIFEBETA<\/span>/i);
