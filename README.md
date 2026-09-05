@@ -1,8 +1,10 @@
-# LifeBeta
+# LifeBeta + Baroke
 
-A provenance-aware personal inflation index and portfolio-exposure laboratory.
+A provenance-aware inflation evidence layer and a verified student-food database.
 
-LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. It is inspired by the useful personal-finance premise of the discontinued startup Wesabe, improved with explicit provenance, package-size normalization, privacy-conscious imports and quantitative diagnostics.
+LifeBeta tracks the prices that actually matter to a person—food, protein bars, gym membership, clothing and soccer jerseys—then compares that personal index with public inflation series and explores how a portfolio behaved during those cost changes. Baroke turns the food-affordability evidence into a place database: students can search reviewed meal prices, open a restaurant to inspect its current deals, or submit a place.
+
+Baroke never publishes a submission immediately. Records begin as pending, become public only after evidence review during a Baroke work session, and return to review after their recorded recheck date. Automation can hide stale data; it cannot declare a place or deal true.
 
 ## Marco's seeded basket
 
@@ -33,14 +35,28 @@ Seeded values are examples, not claims of current prices. Real observations will
 - Saved-basket analysis that retrieves normalized price history without repeated uploads.
 - Release-date-aware comparisons using persisted, source-labeled CPI observations.
 - No-look-ahead basket quality reports for history depth, freshness, and source concentration.
+- A responsive React/TypeScript interface for saved baskets, weighting choices, CPI comparison, product drivers, stale warnings, and missing-data blocks.
+- A tested meal-affordability model that translates price growth into meals lost, budget share, and weekly shortfall.
+- A public Baroke landing page with fixed food-affordability metrics and a BLS source link.
+- A typed D1-backed Baroke place API with pending submissions, verified-only search results, and read-time freshness enforcement.
+- Explainable best-match, nearest, and lowest-price ranking over verified restaurant results.
+- A student submission form that requires only place, cuisine, one meal price, and address; meal details, location notes, discount status, and evidence URL remain optional.
+- A D1-backed deals API with ten source-checked offers; chain promotions use first-party pages and community-reported specials receive shorter recheck dates.
+- Explicit expiration and recheck dates that remove stale deals from the public response without auto-verifying replacements.
+- A relational place-to-deal directory with six starter restaurants, including nearby chain locations and independently sourced NYC bargains.
+- Expandable restaurant cards with a checked-current-deal badge, exact terms, validity boundary, and evidence link.
+- A private review queue with append-only place and deal history.
+- Protected, retry-safe place verification and rejection with reviewer attribution, evidence links, future recheck dates, and stale-write protection.
+- Protected deal re-confirmation and rejection with validated evidence dates, stable command IDs, optimistic concurrency, and immutable audit events.
+- A locked `/review` operations workspace that keeps its credential in page memory and exposes no queue data before server authorization.
 
 Seeded values are examples, never claims of live prices.
 
-## Planned stack
+## Stack
 
 - Python, Polars/pandas, NumPy and statsmodels for transparent analytics.
 - FastAPI for catalog, index and experiment APIs.
-- React/TypeScript for contribution and comparison views.
+- React 19, TypeScript, and vinext for contribution and comparison views and a free public build.
 - PostgreSQL for effective-dated baskets and provenance-aware observations.
 - pytest, Docker and GitHub Actions for repeatable validation.
 
@@ -60,6 +76,16 @@ Start the local API with:
 
 Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 
+Start the public interface in a second terminal:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Open `http://localhost:3000` for Baroke. Open `http://localhost:3000/tracker` for the LifeBeta evidence layer; switch to **Matchday Kit** to see why a missing Liverpool jersey observation blocks the index, while **Training Day** demonstrates a non-blocking stale-price warning.
+
 ## Repository map
 
 | Area | Purpose |
@@ -72,16 +98,24 @@ Then open `http://127.0.0.1:8000/docs` for the interactive API documentation.
 | `src/lifebeta/index.py` | Fixed-basket index and product contributions |
 | `src/lifebeta/holdings.py` | Session-only Fidelity CSV parsing |
 | `src/lifebeta/purchasing_power.py` | Nominal return, real return, and purchasing-power gap |
+| `src/lifebeta/food_affordability.py` | Meals affordable, meals lost, and weekly budget shortfall |
+| `src/lifebeta/student_food.py` | Typed Baroke place records and deterministic search filters |
 | `src/lifebeta/store.py` | Privacy-bounded SQLite persistence for normalized data |
+| `frontend/app/student-eats-landing.tsx` | Baroke launch story and fixed affordability context |
+| `frontend/app/baroque-explorer.tsx` | Verified place search and persistent submission form |
+| `frontend/app/baroke-api.ts` | Typed browser adapter for public data and protected review operations |
+| `frontend/worker/index.ts` | D1 routes, validation, freshness sweeps, and entity-scoped audit history |
+| `frontend/db/schema.ts` | Baroke place/deal tables, many-to-many links, indexes, and reviewed seed records |
+| `frontend/app/inflation-tracker.tsx` | Saved basket controls, data-quality states, and drivers |
+| `frontend/app/globals.css` | Product styling and responsive layout |
 | `tests/` | Small examples that document the intended behavior |
 | `docs/` | Milestone decisions and data flows |
 
-Start with `tests/test_api.py` to understand the HTTP request flow. See [Milestone 2](docs/milestone-2.md) for snapshot logic, [Milestone 3](docs/milestone-3.md) for the API boundary, [Milestone 4](docs/milestone-4.md) for driver attribution and CPI comparison, [Milestone 5](docs/milestone-5.md) for portfolio purchasing power, [Milestone 6](docs/milestone-6.md) for the privacy boundary, [Milestone 7](docs/milestone-7.md) for saved analysis and released benchmarks, and [Milestone 8](docs/milestone-8.md) for coverage diagnostics.
+Start with `tests/test_api.py` to understand the HTTP request flow. Read [Baroke transition design](docs/baroque-transition.md) for the product boundary, proposed production data flow, deal moderation, search architecture, privacy model, and failure modes. [Milestone 12](docs/milestone-12.md) explains the restaurant-to-deal directory, [Milestone 13](docs/milestone-13.md) explains its private review queue and immutable evidence history, [Milestone 14](docs/milestone-14.md) follows a protected place decision from request to publication, [Milestone 15](docs/milestone-15.md) explains the locked reviewer interface, [Milestone 16](docs/milestone-16.md) completes protected deal moderation, [Milestone 17](docs/milestone-17.md) adds protected per-deal evidence timelines, [Milestone 18](docs/milestone-18.md) introduces provenance-backed coordinates and campus-distance search, [Milestone 19](docs/milestone-19.md) adds moderated community deal submissions, [Milestone 20](docs/milestone-20.md) adds the public deal-freshness ledger, and [Milestone 21](docs/milestone-21.md) adds explainable restaurant ranking; the earlier numbered documents explain how the project reached them.
 
 ## Next milestones
 
-1. Add authentication and per-user ownership before accepting public personal data.
-2. Add public CPI comparison series with source citations.
-3. Build the personal contribution and portfolio-exposure interface.
+1. Replace the shared review credential with individual production reviewer sessions.
+2. Replace straight-line distance with walking-route distance after selecting a permitted free routing provider.
 
 This project is educational and does not provide personalized investment advice.

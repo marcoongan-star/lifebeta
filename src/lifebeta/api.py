@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -20,9 +20,11 @@ from .catalog import Category, marco_catalog
 from .index import BasketItem, fixed_basket_index
 from .prices import ALLOWED_PROVENANCE, PriceObservation
 from .purchasing_power import analyze_purchasing_power
+from .food_affordability import analyze_food_affordability
 from .store import LifeBetaStore, StoredBasket
 from .saved_analysis import analyze_saved_basket
 from .quality import assess_basket_quality
+from .student_food import StudentFoodPlace, search_student_food
 
 
 class ProductView(BaseModel):
@@ -131,6 +133,29 @@ class PurchasingPowerResponse(BaseModel):
     purchasing_power_gap: Decimal
     current_value_in_base_dollars: Decimal
     preserved_purchasing_power: bool
+    data_status: str
+
+
+class FoodAffordabilityRequest(BaseModel):
+    base_meal_price: Decimal = Field(gt=0)
+    current_meal_price: Decimal = Field(gt=0)
+    weekly_food_budget: Decimal = Field(gt=0)
+    planned_meals_per_week: int = Field(ge=1, le=35)
+
+
+class FoodAffordabilityResponse(BaseModel):
+    base_meal_price: Decimal
+    current_meal_price: Decimal
+    weekly_food_budget: Decimal
+    planned_meals_per_week: int
+    meal_price_change_percent: Decimal
+    base_meals_affordable: Decimal
+    current_meals_affordable: Decimal
+    meals_lost_per_week: Decimal
+    planned_weekly_cost: Decimal
+    weekly_shortfall: Decimal
+    current_budget_share_percent: Decimal
+    budget_covers_plan: bool
     data_status: str
 
 
@@ -268,6 +293,45 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/v1/student-food/places")
+    def student_food_places(
+        max_price: Decimal = Query(default=Decimal("12"), gt=0),
+        max_distance: Decimal = Query(default=Decimal("1"), gt=0),
+        student_discount_only: bool = False,
+    ) -> dict[str, object]:
+        matches = search_student_food(
+            max_price=max_price,
+            max_distance=max_distance,
+            student_discount_only=student_discount_only,
+        )
+
+        def place_json(place: StudentFoodPlace) -> dict[str, object]:
+            return {
+                "id": place.place_id,
+                "name": place.name,
+                "cuisine": place.cuisine,
+                "typical_meal_price": str(place.typical_meal_price),
+                "distance_miles": str(place.distance_miles),
+                "student_discount": place.student_discount,
+                "meal_note": place.meal_note,
+                "map_position": {"x": place.map_x, "y": place.map_y},
+                "provenance_status": place.provenance_status,
+            }
+
+        return {
+            "places": [place_json(place) for place in matches],
+            "result_count": len(matches),
+            "filters": {
+                "max_price": str(max_price),
+                "max_distance": str(max_distance),
+                "student_discount_only": student_discount_only,
+            },
+            "data_status": (
+                "Seeded Baroke demonstration records; no current restaurant price, "
+                "location, or active discount is implied."
+            ),
+        }
 
     @app.get("/v1/catalog", response_model=list[ProductView])
     def catalog() -> list[ProductView]:
@@ -563,6 +627,24 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
             current_value_in_base_dollars=result.current_value_in_base_dollars,
             preserved_purchasing_power=result.preserved_purchasing_power,
             data_status="Educational calculation from caller-supplied values; not investment advice.",
+        )
+
+    @app.post("/v1/food-affordability", response_model=FoodAffordabilityResponse)
+    def food_affordability(
+        payload: FoodAffordabilityRequest,
+    ) -> FoodAffordabilityResponse:
+        result = analyze_food_affordability(
+            base_meal_price=payload.base_meal_price,
+            current_meal_price=payload.current_meal_price,
+            weekly_food_budget=payload.weekly_food_budget,
+            planned_meals_per_week=payload.planned_meals_per_week,
+        )
+        return FoodAffordabilityResponse(
+            **result.__dict__,
+            data_status=(
+                "Educational affordability calculation from caller-supplied meal prices; "
+                "no live restaurant price implied."
+            ),
         )
 
     @app.post("/v1/portfolio-totals", status_code=201)

@@ -1,0 +1,271 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  loadBarokeDeals,
+  loadBarokePlaces,
+  submitBarokeDeal,
+  submitBarokePlace,
+  type BarokeDeal,
+  type BarokeDealFreshness,
+  type BarokePlace,
+} from "./baroke-api";
+import { scorePlace, sortRankedPlaces } from "./baroke-ranking.mjs";
+
+type DatabaseState = "loading" | "ready" | "unavailable";
+type SubmissionState = "idle" | "saving" | "saved" | "error";
+type DistanceLimit = "all" | 0.25 | 0.5 | 1;
+type SortMode = "best-match" | "nearest" | "lowest-price";
+
+const BARUCH_CAMPUS = { latitude: 40.740173, longitude: -73.98337 };
+
+function distanceFromBaruch(place: BarokePlace): number | null {
+  if (place.latitude === null || place.longitude === null) return null;
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(place.latitude - BARUCH_CAMPUS.latitude);
+  const longitudeDelta = radians(place.longitude - BARUCH_CAMPUS.longitude);
+  const startLatitude = radians(BARUCH_CAMPUS.latitude);
+  const endLatitude = radians(place.latitude);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(startLatitude) * Math.cos(endLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(haversine));
+}
+
+function walkingDirections(address: string): string {
+  return `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${encodeURIComponent(address)}`;
+}
+
+function formatDealDate(value: string): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    .format(new Date(value.includes("T") ? value : `${value}T12:00:00Z`));
+}
+
+export function BarokeExplorer() {
+  const [places, setPlaces] = useState<BarokePlace[]>([]);
+  const [deals, setDeals] = useState<BarokeDeal[]>([]);
+  const [freshness, setFreshness] = useState<BarokeDealFreshness | null>(null);
+  const [maxPrice, setMaxPrice] = useState(12);
+  const [location, setLocation] = useState("");
+  const [dealOnly, setDealOnly] = useState(false);
+  const [distanceLimit, setDistanceLimit] = useState<DistanceLimit>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("best-match");
+  const [expandedPlaceId, setExpandedPlaceId] = useState<string | null>(null);
+  const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
+  const [dealState, setDealState] = useState<DatabaseState>("loading");
+  const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
+  const [submissionMessage, setSubmissionMessage] = useState("");
+  const [dealSubmissionState, setDealSubmissionState] = useState<SubmissionState>("idle");
+  const [dealSubmissionMessage, setDealSubmissionMessage] = useState("");
+
+  const filtered = useMemo(() => {
+    const query = location.trim().toLowerCase();
+    const matching = places.map((place) => ({ place, distanceMiles: distanceFromBaruch(place) })).filter(({ place, distanceMiles }) => {
+      const locationMatches = !query || `${place.address} ${place.locationNote}`.toLowerCase().includes(query);
+      const priceMatches = place.priceMin === null ? place.deals.length > 0 : place.priceMin <= maxPrice;
+      const distanceMatches = distanceLimit === "all" || (distanceMiles !== null && distanceMiles <= distanceLimit);
+      return priceMatches && locationMatches && distanceMatches && (!dealOnly || place.deals.length > 0);
+    }).map((result) => ({ ...result, rank: scorePlace(result.place, result.distanceMiles, maxPrice) }));
+    return sortRankedPlaces(matching, sortMode);
+  }, [dealOnly, distanceLimit, location, maxPrice, places, sortMode]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadBarokePlaces(controller.signal)
+      .then((next) => {
+        setPlaces(next);
+        setDatabaseState("ready");
+      })
+      .catch(() => setDatabaseState("unavailable"));
+    loadBarokeDeals(controller.signal)
+      .then((next) => {
+        setDeals(next.deals);
+        setFreshness(next.freshness);
+        setDealState("ready");
+      })
+      .catch(() => setDealState("unavailable"));
+    return () => controller.abort();
+  }, []);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmissionState("saving");
+    setSubmissionMessage("");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      await submitBarokePlace({
+        name: String(data.get("name") ?? ""),
+        meal_name: String(data.get("meal_name") ?? ""),
+        cuisine: String(data.get("cuisine") ?? ""),
+        meal_price: Number(data.get("meal_price")),
+        address: String(data.get("address") ?? ""),
+        location_note: String(data.get("location_note") ?? ""),
+        student_discount: data.get("student_discount") === "on",
+        source_url: String(data.get("source_url") ?? ""),
+      });
+      form.reset();
+      setSubmissionState("saved");
+      setSubmissionMessage("Saved for Codex review. It will not appear publicly until I check its price and location during a Baroke work session.");
+    } catch (error) {
+      setSubmissionState("error");
+      setSubmissionMessage(error instanceof Error ? error.message : "Place could not be saved.");
+    }
+  }
+
+  async function handleDealSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDealSubmissionState("saving");
+    setDealSubmissionMessage("");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      await submitBarokeDeal(String(data.get("place_id") ?? ""), {
+        title: String(data.get("title") ?? ""),
+        details: String(data.get("details") ?? ""),
+        requirement: String(data.get("requirement") ?? ""),
+        source_url: String(data.get("source_url") ?? ""),
+      });
+      form.reset();
+      setDealSubmissionState("saved");
+      setDealSubmissionMessage("Saved for review. The offer stays private until its proof and terms are checked.");
+    } catch (error) {
+      setDealSubmissionState("error");
+      setDealSubmissionMessage(error instanceof Error ? error.message : "Deal could not be saved.");
+    }
+  }
+
+  return (
+    <>
+      <section className="explore-section" id="places">
+        <div className="baroque-section-head">
+          <div><h2>Find lunch between classes.</h2></div><p>Choose a place to see its checked offers, exact terms, and source.</p>
+        </div>
+        <div className="filter-bar">
+          <fieldset><legend>MEAL PRICE</legend>{[8, 12, 16].map((price) => <button type="button" className={maxPrice === price ? "active" : ""} onClick={() => setMaxPrice(price)} key={price}>Up to ${price}</button>)}</fieldset>
+          <label>LOCATION<input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Street or neighborhood" /></label>
+          <fieldset><legend>FROM BARUCH</legend>{(["all", 0.25, 0.5, 1] as const).map((distance) => <button type="button" className={distanceLimit === distance ? "active" : ""} onClick={() => setDistanceLimit(distance)} key={distance}>{distance === "all" ? "Any" : `≤ ${distance} mi`}</button>)}</fieldset>
+          <label className="discount-toggle"><input type="checkbox" checked={dealOnly} onChange={(event) => setDealOnly(event.target.checked)} /><span />Current deal only</label>
+          <label className="sort-control">SORT<select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}><option value="best-match">Best match</option><option value="nearest">Nearest</option><option value="lowest-price">Lowest price</option></select></label>
+          <div className="result-count"><strong>{filtered.length}</strong><span>verified places</span></div>
+        </div>
+
+        <div className="verified-grid">
+          <div className="place-list">
+            {databaseState === "loading" && <div className="no-matches"><strong>Loading verified places…</strong></div>}
+            {databaseState === "unavailable" && <div className="no-matches"><strong>Place database is temporarily unavailable.</strong><p>You can still add a place below and try again shortly.</p></div>}
+            {databaseState === "ready" && filtered.length === 0 && <div className="no-matches"><strong>No verified matches yet.</strong><p>Add a place below. New submissions stay private until they pass review.</p></div>}
+            {databaseState === "ready" && filtered.map(({ place, distanceMiles, rank }) => {
+              const expanded = expandedPlaceId === place.id;
+              return (
+                <article className={`verified-place${expanded ? " expanded" : ""}`} key={place.id}>
+                  <button className="place-summary" type="button" aria-expanded={expanded} onClick={() => setExpandedPlaceId(expanded ? null : place.id)}>
+                    <span className="place-price">{place.priceLabel}<small>{place.priceMin === null ? "current offer" : "meal price"}</small></span>
+                    <span className="place-copy"><small>{place.cuisine} · {place.address}</small><strong>{place.name}</strong><span>{[place.mealName, place.locationNote].filter(Boolean).join(" · ")}</span></span>
+                    <span className="place-badges"><i className="match-score">{rank.score} MATCH</i>{distanceMiles !== null && <i>{distanceMiles.toFixed(2)} MI FROM BARUCH</i>}{place.deals.length > 0 && <i className="current-deal">✓ CURRENT DEAL</i>}{place.studentDiscount && <i>STUDENT DISCOUNT</i>}<i>VERIFIED</i></span>
+                    <b className="place-expand" aria-hidden="true">{expanded ? "−" : "+"}</b>
+                  </button>
+                  {expanded && (
+                    <div className="place-deal-drawer">
+                      <div className="rank-explanation"><strong>WHY THIS RANKED HERE</strong><span>Price {rank.components.affordability}/50</span><span>Distance {rank.components.proximity}/25</span><span>Deal {rank.components.currentDeal}/15</span><span>Student discount {rank.components.studentDiscount}/10</span></div>
+                      <div className="place-deal-head"><span>{place.deals.length} CURRENT {place.deals.length === 1 ? "OFFER" : "OFFERS"}</span><div><a href={walkingDirections(place.address)} target="_blank" rel="noreferrer">Walking map ↗</a>{place.coordinateSourceUrl && <a href={place.coordinateSourceUrl} target="_blank" rel="noreferrer">Coordinate source ↗</a>}{place.sourceUrl && <a href={place.sourceUrl} target="_blank" rel="noreferrer">Place source ↗</a>}</div></div>
+                      {place.deals.length === 0 && <p>No linked deal is current. The place itself is still verified.</p>}
+                      {place.deals.map((deal) => (
+                        <article key={deal.id}>
+                          <div><i>✓</i><h3>{deal.title}</h3></div>
+                          <p>{deal.details}</p>
+                          <p className="place-deal-terms">{deal.requirement}</p>
+                          <footer><span>{deal.expiresAt ? `Ends ${formatDealDate(deal.expiresAt)}` : `Recheck by ${formatDealDate(deal.checkAfter)}`}</span><a href={deal.sourceUrl} target="_blank" rel="noreferrer">Deal source ↗</a></footer>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          <aside className="verification-panel">
+            <small>HOW VERIFICATION WORKS</small>
+            <ol>
+              <li><span>1</span><p>A student adds the place, cuisine, meal price, and address. Extra details are optional.</p></li>
+              <li><span>2</span><p>Codex checks the submitted source or receipt during a Baroke review session.</p></li>
+              <li><span>3</span><p>A checked deal appears directly on its restaurant card.</p></li>
+              <li><span>4</span><p>Expired or overdue offers disappear until Codex verifies them again.</p></li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <section className="deals-section" id="deals">
+        <div className="baroque-section-head inverse">
+          <div><span>DATABASE-ENFORCED FRESHNESS</span><h2>Confirmed deals.</h2></div>
+          <p>Terms and participation can vary by location. Open the original source before ordering.</p>
+        </div>
+        <div className="freshness-ledger">
+          <div><small>PUBLIC NOW</small><strong>{freshness?.confirmedCount ?? "—"}</strong><span>confirmed offers</span></div>
+          <div><small>ENDING IN 7 DAYS</small><strong>{freshness?.expiresWithinSevenDays ?? "—"}</strong><span>hidden after their deadline</span></div>
+          <div><small>RECHECKS IN 7 DAYS</small><strong>{freshness?.rechecksWithinSevenDays ?? "—"}</strong><span>removed if not renewed</span></div>
+          <div><small>NEXT TRUST BOUNDARY</small><strong>{freshness?.nextBoundary ? formatDealDate(freshness.nextBoundary) : "—"}</strong><span>{freshness ? `Snapshot ${formatDealDate(freshness.asOf)}` : "loading current status"}</span></div>
+        </div>
+        <div className="deal-grid">
+          {dealState === "loading" && <div className="deal-empty"><strong>Loading confirmed deals…</strong></div>}
+          {dealState === "unavailable" && <div className="deal-empty"><strong>Deals are temporarily unavailable.</strong><p>Try again shortly.</p></div>}
+          {dealState === "ready" && deals.length === 0 && <div className="deal-empty"><strong>No current confirmed deals.</strong><p>Offers with expired or overdue checks are hidden automatically.</p></div>}
+          {dealState === "ready" && deals.map((deal, index) => (
+            <article key={deal.id}>
+              <span className="deal-number">{String(index + 1).padStart(2, "0")}</span>
+              <small>{deal.brand}</small>
+              <h3>{deal.title}</h3>
+              <p>{deal.details}</p>
+              <p className="deal-terms">{deal.requirement}</p>
+              <div className="deal-meta">
+                <i>CONFIRMED</i>
+                <a href={deal.sourceUrl} target="_blank" rel="noreferrer">Original source ↗</a>
+              </div>
+              <span className="deal-checked">Checked {formatDealDate(deal.verifiedAt)}</span>
+              <span className="deal-validity">{deal.expiresAt ? `Ends ${formatDealDate(deal.expiresAt)}` : `Recheck by ${formatDealDate(deal.checkAfter)}`}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="submit-section" id="add-place">
+        <div><h2>Add a place.</h2><p>Add a place and the price you paid or saw. Optional details help me verify it during our next Baroke work session.</p></div>
+        <form onSubmit={handleSubmit}>
+          <label>PLACE<input name="name" required placeholder="Restaurant or store" /></label>
+          <label>CUISINE<input name="cuisine" required placeholder="Mexican, deli, pizza…" /></label>
+          <label>MEAL PRICE<input name="meal_price" required type="number" min="0.01" step="0.01" placeholder="10.00" /></label>
+          <label className="form-wide">ADDRESS<input name="address" required placeholder="Street address" /></label>
+          <label>MEAL OR ITEM · OPTIONAL<input name="meal_name" placeholder="Chicken bowl, lunch special…" /></label>
+          <label>LOCATION DETAILS · OPTIONAL<input name="location_note" placeholder="Neighborhood or walking landmark" /></label>
+          <label className="form-wide">MENU OR RECEIPT LINK · OPTIONAL<input name="source_url" type="url" placeholder="https://…" /></label>
+          <label className="form-check"><input name="student_discount" type="checkbox" />This place offers a student discount</label>
+          <button type="submit" disabled={submissionState === "saving"}>{submissionState === "saving" ? "Saving…" : "Submit for verification →"}</button>
+          {submissionMessage && <p className={submissionState === "error" ? "form-message error" : "form-message"}>{submissionMessage}</p>}
+        </form>
+      </section>
+      <section className="submit-section" id="add-deal">
+        <div><h2>Add a deal.</h2><p>Found a student discount, late-night markdown, or app offer? Link it to a verified place. It stays private until the evidence is checked.</p></div>
+        <form onSubmit={handleDealSubmit}>
+          <label>VERIFIED PLACE<select name="place_id" required defaultValue=""><option value="" disabled>Choose a place</option>{places.map((place) => <option key={place.id} value={place.id}>{place.name} · {place.address}</option>)}</select></label>
+          <label>DEAL TITLE<input name="title" required minLength={3} placeholder="50% off after 8 PM" /></label>
+          <label className="form-wide">WHAT THE DEAL INCLUDES<input name="details" required minLength={8} placeholder="Which items, times, or order method qualify?" /></label>
+          <label className="form-wide">TERMS · OPTIONAL<input name="requirement" placeholder="App required, weekday only, while supplies last…" /></label>
+          <label className="form-wide">PROOF LINK<input name="source_url" required type="url" placeholder="https://…" /></label>
+          <button type="submit" disabled={dealSubmissionState === "saving" || places.length === 0}>{dealSubmissionState === "saving" ? "Saving…" : "Submit deal for verification →"}</button>
+          {dealSubmissionMessage && <p className={dealSubmissionState === "error" ? "form-message error" : "form-message"}>{dealSubmissionMessage}</p>}
+        </form>
+      </section>
+    </>
+  );
+}
+
+export function MealMetrics() {
+  return (
+    <div className="base-metrics">
+      <article><small>MEAL PRICE THEN</small><strong>$9.00</strong><span>base assumption</span></article>
+      <article><small>MEAL PRICE NOW</small><strong>$13.00</strong><span>base assumption</span></article>
+      <article><small>MEALS LOST / WEEK</small><strong>2.6</strong><span>with the same $75 budget</span></article>
+      <article><small>WEEKLY SHORTFALL</small><strong>$16</strong><span>for seven meals</span></article>
+    </div>
+  );
+}
